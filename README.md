@@ -4,7 +4,7 @@
 
 Recruiting OS helps students manage the end-to-end recruiting process by converting scattered recruiting-related information into a structured opportunity pipeline.
 
-Students receive recruiting information from Gmail, LinkedIn, job postings, OAs, interview scheduling, follow-ups, and rejections/offers. This app ingests those messages, extracts structured data, classifies pipeline stage, generates next actions and draft replies, and shows what matters **today**.
+Students get recruiting information from everywhere — Gmail, LinkedIn, job postings, OAs, interview scheduling, follow-ups, rejections, offers. This app ingests those messages, extracts structured data, classifies pipeline stage, generates next actions and draft replies, and surfaces what matters **today**.
 
 ## Tech stack
 
@@ -17,35 +17,24 @@ Students receive recruiting information from Gmail, LinkedIn, job postings, OAs,
 ## MVP features
 
 - Manual message intake (paste email / LinkedIn / job post)
-- Heuristic extraction → company, role, stage, deadline, next action
-- Supabase-backed opportunities, messages, actions, drafts
+- Heuristic extraction of company, role, stage, deadline, next action
+- Supabase-backed opportunities, messages, actions, and drafts
 - Kanban-style pipeline board with stage updates
 - Today view with prioritized pending actions
-- Opportunity detail page with messages, JSON, drafts, actions
-- Mock draft generation (reply, follow-up, scheduling)
+- Opportunity detail page with messages, JSON, drafts, and actions
+- Mock draft generation for replies, follow-ups, and scheduling
 - Demo data seed endpoint
-
-## Supabase setup
-
-1. Open your Supabase project **cs153**.
-2. Go to **SQL Editor** → **New query**.
-3. Copy the contents of [`supabase/schema.sql`](supabase/schema.sql).
-4. Paste and **Run**.
-
-This creates `opportunities`, `messages`, `actions`, and `drafts` tables plus MVP row-level security policies.
 
 ## Environment variables
 
-Create `.env.local` in the project root:
+Create `.env.local` in the project root (see [`.env.example`](.env.example) for a template):
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Find these in Supabase → **Project Settings** → **API**.
-
-See [`.env.example`](.env.example) for a template.
+These are in Supabase under **Project Settings → API**.
 
 ## Run locally
 
@@ -58,11 +47,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Seed demo data
 
-1. Open the homepage.
-2. Click **Load Demo Data** (calls `POST /api/seed`).
-3. You’ll be redirected to `/pipeline` with sample opportunities.
-
-Or call the API directly:
+Click **Load Demo Data** on the homepage, which calls `POST /api/seed` and redirects you to `/pipeline` with sample opportunities already populated. Or call it directly:
 
 ```bash
 curl -X POST http://localhost:3000/api/seed
@@ -71,18 +56,18 @@ curl -X POST http://localhost:3000/api/seed
 ## Core user flow
 
 1. Open app → **Add Message**
-2. Paste recruiter message → **Process Message**
-3. View extracted opportunity on detail page
-4. Generate draft reply / follow-up / scheduling reply
+2. Paste a recruiter message → **Process Message**
+3. View the extracted opportunity on its detail page
+4. Generate a draft reply, follow-up, or scheduling response
 5. Browse **Pipeline** and **Today**
-6. Mark actions complete and update stages
+6. Mark actions complete and update stages as things move
 
 ## Current limitations
 
-- No real authentication (`demo-user` hardcoded)
-- No Gmail or Google Calendar integration
-- No real LLM extraction or reply generation
-- Heuristic parser may misclassify edge cases
+- No real authentication (`demo-user` is hardcoded)
+- No Gmail or Google Calendar integration yet
+- Extraction and reply generation are heuristic, not LLM-based
+- The heuristic parser will misclassify edge cases
 - Scheduling availability is placeholder text
 
 ## Future work
@@ -92,7 +77,7 @@ curl -X POST http://localhost:3000/api/seed
 - Google OAuth login
 - Real LLM structured extraction (OpenAI, Cloudflare Workers AI, etc.)
 - Real LLM reply generation with tone control
-- Smarter prioritization and notifications/reminders
+- Smarter prioritization and reminders
 - Multi-user auth and per-user RLS policies
 
 ## Project structure
@@ -104,16 +89,4 @@ src/
   lib/           # Supabase, mock extractors, prioritizer
 supabase/
   schema.sql     # Database schema
-```
-
-## GitHub
-
-After setup:
-
-```bash
-git init   # if not already initialized in this folder
-git add .
-git commit -m "Build Recruiting OS MVP"
-git remote add origin https://github.com/YOUR_USER/recruiting-os.git
-git push -u origin main
 ```
