@@ -39,7 +39,7 @@ export default async function HomePage() {
         </p>
         <p className="mt-4 max-w-2xl text-slate-600">
           Recruiting OS ingests recruiter emails, LinkedIn messages, job posts,
-          and scheduling notes — then extracts structured opportunities, classifies
+          and scheduling notes, then extracts structured opportunities, classifies
           your pipeline stage, and tells you what to do today.
         </p>
       </div>
