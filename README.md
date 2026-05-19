@@ -72,13 +72,29 @@ curl -X POST http://localhost:3000/api/seed
 
 ## Future work
 
-- Gmail API ingestion
-- Google Calendar integration for real availability
-- Google OAuth login
-- Real LLM structured extraction (OpenAI, Cloudflare Workers AI, etc.)
-- Real LLM reply generation with tone control
-- Smarter prioritization and reminders
-- Multi-user auth and per-user RLS policies
+- Google OAuth login and multi-user auth with per-user RLS policies
+- Google Calendar integration for real scheduling availability
+- Real LLM structured extraction and reply generation with tone control
+- Smarter prioritization, reminders, and notifications
+
+### Opportunity sourcing 
+
+The MVP only supports **manual paste** intake. Next we want a real **sourcing layer** that feeds the same pipeline:
+
+- **Gmail API** — sync recruiter threads, OAs, scheduling, rejections, and offers into `messages` automatically
+- **LinkedIn** — manual paste for now; later export/import or approved integrations where feasible
+- **Job posts** — paste or URL capture → extract company, role, and deadlines into new or existing opportunities
+- **Deduping & linking** — match incoming messages to existing opportunities (company + role + recruiter) instead of creating duplicates
+- **Backfill** — one-time import of a recruiting inbox so students start with a populated pipeline
+
+Sourcing should enqueue work (parse → classify → prioritize) rather than blocking the UI on large imports.
+
+### Compute usage
+
+- **Cloudflare Workers AI** — structured extraction and stage classification on intake (and on each Gmail sync event); on-demand draft generation for replies, follow-ups, and scheduling. Drafts cached in Supabase to avoid repeat inference.
+- **DigitalOcean** — async Gmail sync and inbox backfill (poll/webhook worker + queue, batch re-processing). Keeps long jobs off the request path.
+
+Interactive actions stay on the edge; bulk work runs async. The MVP uses heuristics in Next.js API routes with no model calls until this is wired up.
 
 ## Project structure
 
