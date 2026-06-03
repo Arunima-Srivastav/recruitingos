@@ -44,6 +44,9 @@ export default function IntakePage() {
         Paste a recruiter email, LinkedIn message, job posting, OA notice, or
         scheduling email.
       </p>
+      <p className="mt-3 inline-block rounded-md bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+        MVP: uses heuristic extraction (regex/keywords), not an LLM yet
+      </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>

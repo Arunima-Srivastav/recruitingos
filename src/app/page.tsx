@@ -1,6 +1,8 @@
 import Link from "next/link";
+import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import StatCard from "@/components/StatCard";
 import LoadDemoButton from "@/components/LoadDemoButton";
+import { getSupabaseConfigError } from "@/lib/config";
 import {
   countOpportunities,
   countPendingActions,
@@ -10,21 +12,24 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  const configError = getSupabaseConfigError();
   let opportunityCount = 0;
   let pendingActionCount = 0;
   let needsReplyCount = 0;
-  let dbError: string | null = null;
+  let dbError: string | null = configError;
 
-  try {
-    opportunityCount = await countOpportunities();
-    pendingActionCount = await countPendingActions();
-    const opps = await getOpportunities();
-    needsReplyCount = opps.filter((o) => o.stage === "Needs Reply").length;
-  } catch (err) {
-    dbError =
-      err instanceof Error
-        ? err.message
-        : "Could not connect to Supabase. Check your environment variables.";
+  if (!configError) {
+    try {
+      opportunityCount = await countOpportunities();
+      pendingActionCount = await countPendingActions();
+      const opps = await getOpportunities();
+      needsReplyCount = opps.filter((o) => o.stage === "Needs Reply").length;
+    } catch (err) {
+      dbError =
+        err instanceof Error
+          ? err.message
+          : "Could not connect to Supabase. Check your environment variables.";
+    }
   }
 
   return (
@@ -45,8 +50,8 @@ export default async function HomePage() {
       </div>
 
       {dbError && (
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {dbError}
+        <div className="mb-6">
+          <ConfigErrorBanner message={dbError} />
         </div>
       )}
 

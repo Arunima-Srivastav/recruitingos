@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import DraftCard from "@/components/DraftCard";
+import { getSupabaseConfigError } from "@/lib/config";
 import { STAGES, TONES } from "@/lib/constants";
 import type { Tone } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
@@ -28,6 +30,14 @@ export default function OpportunityDetailPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    const configError = getSupabaseConfigError();
+    if (configError) {
+      setError(configError);
+      setLoading(false);
+      return;
+    }
+
     try {
       const supabase = getSupabase();
       const [oppRes, msgRes, actRes, draftRes] = await Promise.all([
@@ -128,7 +138,11 @@ export default function OpportunityDetailPage() {
   if (!opportunity) {
     return (
       <div className="px-4 py-8 sm:px-6">
-        <p className="text-red-600">{error ?? "Opportunity not found"}</p>
+        {getSupabaseConfigError() && error ? (
+          <ConfigErrorBanner message={error} />
+        ) : (
+          <p className="text-red-600">{error ?? "Opportunity not found"}</p>
+        )}
         <Link href="/pipeline" className="mt-4 inline-block text-indigo-600">
           ← Back to pipeline
         </Link>
@@ -208,9 +222,12 @@ export default function OpportunityDetailPage() {
       </div>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">
+        <h2 className="mb-1 text-lg font-semibold text-slate-900">
           Generate draft
         </h2>
+        <p className="mb-3 text-xs text-slate-500">
+          MVP: template-based mock drafts (not sent automatically)
+        </p>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <label className="text-sm text-slate-600">Tone:</label>
           <select
@@ -293,32 +310,38 @@ export default function OpportunityDetailPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-900">
           Original messages
         </h2>
-        <div className="space-y-4">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-            >
-              <p className="text-xs text-slate-500">
-                {msg.sender_name ?? "Unknown"} · {msg.source} ·{" "}
-                {formatDate(msg.created_at)}
-              </p>
-              <pre className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                {msg.body}
-              </pre>
-              {msg.extracted_json && (
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-sm font-medium text-indigo-600">
-                    Extracted JSON
-                  </summary>
-                  <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs">
-                    {JSON.stringify(msg.extracted_json, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </div>
-          ))}
-        </div>
+        {messages.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No messages linked to this opportunity yet.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <p className="text-xs text-slate-500">
+                  {msg.sender_name ?? "Unknown"} · {msg.source} ·{" "}
+                  {formatDate(msg.created_at)}
+                </p>
+                <pre className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                  {msg.body}
+                </pre>
+                {msg.extracted_json && (
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-medium text-indigo-600">
+                      Extracted JSON (heuristic parser)
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs">
+                      {JSON.stringify(msg.extracted_json, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

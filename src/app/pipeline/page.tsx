@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import StageColumn from "@/components/StageColumn";
 import EmptyState from "@/components/EmptyState";
+import { getSupabaseConfigError } from "@/lib/config";
 import Link from "next/link";
 import { STAGES } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
@@ -17,6 +19,14 @@ export default function PipelinePage() {
   const fetchOpportunities = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    const configError = getSupabaseConfigError();
+    if (configError) {
+      setError(configError);
+      setLoading(false);
+      return;
+    }
+
     try {
       const supabase = getSupabase();
       const { data, error: fetchError } = await supabase
@@ -84,9 +94,15 @@ export default function PipelinePage() {
       )}
 
       {error && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+        <div className="mb-4">
+          {getSupabaseConfigError() ? (
+            <ConfigErrorBanner message={error} />
+          ) : (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+        </div>
       )}
 
       {!loading && !error && opportunities.length === 0 && (
