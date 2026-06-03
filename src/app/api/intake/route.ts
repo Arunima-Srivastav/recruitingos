@@ -4,13 +4,19 @@ import {
   createMessage,
   createOpportunity,
 } from "@/lib/db";
+import { normalizeReviewedExtraction } from "@/lib/ai/extract";
 import { mockExtract } from "@/lib/mockExtractor";
 import { calculatePriority } from "@/lib/prioritizer";
+import type { ExtractedRecruitingData } from "@/lib/types";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { text, source } = body as { text?: string; source?: string };
+    const { text, source, extracted } = body as {
+      text?: string;
+      source?: string;
+      extracted?: ExtractedRecruitingData;
+    };
 
     if (!text || typeof text !== "string" || !text.trim()) {
       return NextResponse.json(
@@ -19,56 +25,59 @@ export async function POST(request: Request) {
       );
     }
 
-    const extracted = mockExtract(text);
+    const extractedData = extracted
+      ? normalizeReviewedExtraction(extracted)
+      : mockExtract(text);
+
     const priority = calculatePriority({
-      stage: extracted.stage,
-      action_type: extracted.action_type,
-      deadline: extracted.deadline,
+      stage: extractedData.stage,
+      action_type: extractedData.action_type,
+      deadline: extractedData.deadline,
       created_at: new Date().toISOString(),
     });
 
     const opportunity = await createOpportunity({
-      company: extracted.company,
-      role_title: extracted.role_title,
+      company: extractedData.company,
+      role_title: extractedData.role_title,
       source: source ?? "manual",
-      stage: extracted.stage,
+      stage: extractedData.stage,
       priority_score: priority.score,
-      deadline: extracted.deadline,
-      next_action: extracted.next_action,
-      notes: extracted.short_summary,
+      deadline: extractedData.deadline,
+      next_action: extractedData.next_action,
+      notes: extractedData.short_summary,
     });
 
     await createMessage({
       opportunity_id: opportunity.id,
       source: source ?? "manual",
-      sender_name: extracted.recruiter_name,
-      sender_email: extracted.recruiter_email,
+      sender_name: extractedData.recruiter_name,
+      sender_email: extractedData.recruiter_email,
       subject: null,
       body: text.trim(),
       received_at: new Date().toISOString(),
-      extracted_json: extracted,
+      extracted_json: extractedData,
       external_message_id: null,
     });
 
     if (
-      extracted.next_action &&
-      extracted.action_type &&
-      extracted.action_type !== "none"
+      extractedData.next_action &&
+      extractedData.action_type &&
+      extractedData.action_type !== "none"
     ) {
       const actionPriority = calculatePriority({
-        stage: extracted.stage,
-        action_type: extracted.action_type,
-        deadline: extracted.deadline,
-        due_at: extracted.deadline,
+        stage: extractedData.stage,
+        action_type: extractedData.action_type,
+        deadline: extractedData.deadline,
+        due_at: extractedData.deadline,
         created_at: new Date().toISOString(),
       });
 
       await createAction({
         opportunity_id: opportunity.id,
-        action_type: extracted.action_type,
-        title: extracted.next_action,
-        description: extracted.short_summary,
-        due_at: extracted.deadline,
+        action_type: extractedData.action_type,
+        title: extractedData.next_action,
+        description: extractedData.short_summary,
+        due_at: extractedData.deadline,
         priority_score: actionPriority.score,
       });
     }

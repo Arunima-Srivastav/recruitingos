@@ -12,12 +12,14 @@ Students get recruiting information from everywhere — Gmail, LinkedIn, job pos
 - **Tailwind CSS**
 - **Supabase** (Postgres)
 - **Next.js API routes** for backend logic
-- **Heuristic extraction & mock draft generation** (MVP — LLM integration planned)
+- **Heuristic fallback extraction** when Ollama is unavailable
+- **Ollama Cloud** for structured message extraction (with review step)
 
 ## MVP features
 
 - Manual message intake (paste email / LinkedIn / job post)
-- Heuristic extraction of company, role, stage, deadline, next action
+- Ollama Cloud extraction with review/edit before saving
+- Heuristic fallback when Ollama is not configured or fails
 - Supabase-backed opportunities, messages, actions, and drafts
 - Kanban-style pipeline board with stage updates
 - Today view with prioritized pending actions
@@ -56,7 +58,15 @@ Required variables:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
 
-Find both in Supabase under **Project Settings → API**.
+Optional for AI extraction (falls back to heuristics without these):
+
+| Variable | Description |
+|----------|-------------|
+| `OLLAMA_API_KEY` | API key from [ollama.com](https://ollama.com) → Settings → Keys |
+| `OLLAMA_BASE_URL` | Ollama Cloud API host (default: `https://ollama.com`) |
+| `OLLAMA_MODEL` | Cloud model from your API (`curl https://ollama.com/api/tags`) — default `ministral-3:3b` |
+
+Find Supabase values under **Project Settings → API**.
 
 ### 3. Set up the database
 
@@ -97,7 +107,7 @@ The seed endpoint is idempotent: if five or more opportunities already exist, it
 ## Core user flow
 
 1. **Dashboard** (`/`) — overview stats and quick links
-2. **Add Message** (`/intake`) — paste a recruiting message → heuristic extraction → new opportunity
+2. **Add Message** (`/intake`) — paste message → Ollama extraction → review fields → save to pipeline
 3. **Pipeline** (`/pipeline`) — kanban board grouped by stage
 4. **Today** (`/today`) — prioritized pending actions
 5. **Opportunity detail** (`/opportunities/[id]`) — stage updates, drafts, actions, original messages
@@ -107,7 +117,8 @@ The seed endpoint is idempotent: if five or more opportunities already exist, it
 ```
 src/
   app/              # Pages and API routes
-    api/intake/       # POST message → extract → create opportunity
+    api/ai/extract-message/  # POST Ollama extraction
+    api/intake/       # POST save reviewed opportunity
     api/seed/         # POST demo data
     api/drafts/       # POST mock draft generation
     intake/           # Manual message paste
@@ -116,7 +127,8 @@ src/
     opportunities/    # Detail view
   components/         # UI components
   lib/
-    mockExtractor.ts  # Heuristic message parser (MVP)
+    mockExtractor.ts  # Heuristic fallback parser
+    ai/               # Ollama client, schemas, extraction
     mockDraftGenerator.ts
     prioritizer.ts
     db.ts             # Supabase data access
@@ -129,7 +141,8 @@ supabase/
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/intake` | POST | Parse message, create opportunity + action |
+| `/api/ai/extract-message` | POST | Extract fields with Ollama (or heuristic fallback) |
+| `/api/intake` | POST | Save reviewed extraction to pipeline |
 | `/api/seed` | POST | Load demo opportunities |
 | `/api/drafts/generate` | POST | Generate mock reply draft |
 | `/api/opportunities/update-stage` | POST | Move opportunity to a new stage |
@@ -139,14 +152,30 @@ supabase/
 
 - No real authentication (`demo-user` is hardcoded)
 - No Gmail or Google Calendar integration yet
-- Extraction uses regex/keyword heuristics, not an LLM — will misclassify edge cases
+- Extraction falls back to regex/keyword heuristics if Ollama fails or is not configured
 - Draft generation is template-based, not AI-generated
 - Scheduling availability in drafts is placeholder text
 - If Supabase env vars are missing, pages show a setup banner instead of crashing
 
+## Ollama setup
+
+1. Sign in at [ollama.com](https://ollama.com)
+2. Create an API key under **Settings → Keys**
+3. List models your key can access: `curl https://ollama.com/api/tags -H "Authorization: Bearer $OLLAMA_API_KEY"`. We default to **`ministral-3:3b`** (smallest/cheapest in most accounts).
+4. Add to `.env.local`:
+
+```env
+OLLAMA_API_KEY=your-key-here
+OLLAMA_BASE_URL=https://ollama.com
+OLLAMA_MODEL=ministral-3:3b
+```
+
+5. Restart `npm run dev` after changing env vars
+
+Without `OLLAMA_API_KEY`, intake still works using the heuristic fallback parser.
+
 ## Future work
 
-- Ollama Cloud for structured extraction and draft generation
 - Google OAuth + Gmail import with review screen
 - Google Calendar / iCal export
 - Discover page for public GitHub job sources (e.g. SimplifyJobs)
