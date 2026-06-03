@@ -63,6 +63,16 @@ export interface ExtractedRecruitingData {
   is_time_sensitive: boolean;
   confidence: number;
   short_summary: string;
+  provider?: "ollama" | "heuristic";
+  extraction_status?: "success" | "partial" | "failed" | "fallback";
+  needs_review?: boolean;
+  explanation?: string | null;
+  raw_model_output?: string | null;
+  model?: string | null;
+  ai_stage?: string | null;
+  location?: string | null;
+  next_action_date?: string | null;
+  priority?: string | null;
 }
 
 export interface ActionWithOpportunity extends Action {
