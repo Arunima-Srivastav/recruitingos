@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { updateOpportunityStage } from "@/lib/db";
 import { STAGES } from "@/lib/constants";
@@ -24,8 +25,6 @@ export async function POST(request: Request) {
     const opportunity = await updateOpportunityStage(opportunity_id, stage);
     return NextResponse.json({ opportunity });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to update stage";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to update stage");
   }
 }

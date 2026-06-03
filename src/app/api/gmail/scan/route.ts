@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { getImportedGmailMessageIds } from "@/lib/db";
 import { mockExtract } from "@/lib/mockExtractor";
@@ -52,11 +53,15 @@ export async function POST(request: Request) {
       messages,
     });
   } catch (err) {
-    const raw =
-      err instanceof Error ? err.message : "Failed to scan Gmail";
-    const message = raw.includes("Too many concurrent requests")
-      ? "Gmail rate limit hit. Wait a few seconds and try Scan again."
-      : raw;
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (err instanceof Error && err.message.includes("Too many concurrent requests")) {
+      return NextResponse.json(
+        {
+          error:
+            "Gmail rate limit hit. Wait a few seconds and try Scan again.",
+        },
+        { status: 500 }
+      );
+    }
+    return handleApiError(err, "Failed to scan Gmail");
   }
 }

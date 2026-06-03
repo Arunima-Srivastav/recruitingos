@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import AuthNav from "@/components/AuthNav";
 import { cn } from "@/lib/utils";
 
 const links = [
@@ -12,7 +13,7 @@ const links = [
   { href: "/today", label: "Today" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ userEmail }: { userEmail: string | null }) {
   const pathname = usePathname();
 
   return (
@@ -24,21 +25,24 @@ export default function Navbar() {
           </span>
           <span className="font-semibold text-slate-900">Recruiting OS</span>
         </Link>
-        <nav className="flex items-center gap-1">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                pathname === link.href
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
+        <nav className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  pathname === link.href
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+          <AuthNav initialEmail={userEmail} />
         </nav>
       </div>
     </header>

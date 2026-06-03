@@ -2,6 +2,7 @@ import Link from "next/link";
 import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import StatCard from "@/components/StatCard";
 import LoadDemoButton from "@/components/LoadDemoButton";
+import { getCurrentUser } from "@/lib/auth/server";
 import { getSupabaseConfigError } from "@/lib/config";
 import {
   countOpportunities,
@@ -13,12 +14,13 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const configError = getSupabaseConfigError();
+  const user = await getCurrentUser();
   let opportunityCount = 0;
   let pendingActionCount = 0;
   let needsReplyCount = 0;
   let dbError: string | null = configError;
 
-  if (!configError) {
+  if (user && !configError) {
     try {
       opportunityCount = await countOpportunities();
       pendingActionCount = await countPendingActions();
@@ -49,39 +51,63 @@ export default async function HomePage() {
         </p>
       </div>
 
+      {!user && (
+        <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          <Link href="/login" className="font-medium underline hover:text-indigo-950">
+            Sign in
+          </Link>{" "}
+          to access your private pipeline, Gmail import, and saved opportunities.
+        </div>
+      )}
+
       {dbError && (
         <div className="mb-6">
           <ConfigErrorBanner message={dbError} />
         </div>
       )}
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Opportunities" value={opportunityCount} />
-        <StatCard label="Pending actions" value={pendingActionCount} />
-        <StatCard label="Needs reply" value={needsReplyCount} />
-      </div>
+      {user && (
+        <>
+          <div className="mb-8 grid gap-4 sm:grid-cols-3">
+            <StatCard label="Opportunities" value={opportunityCount} />
+            <StatCard label="Pending actions" value={pendingActionCount} />
+            <StatCard label="Needs reply" value={needsReplyCount} />
+          </div>
 
-      <div className="mb-8 flex flex-wrap gap-3">
-        <Link
-          href="/intake"
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          Add Message
-        </Link>
-        <Link
-          href="/pipeline"
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          View Pipeline
-        </Link>
-        <Link
-          href="/today"
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Today
-        </Link>
-        <LoadDemoButton />
-      </div>
+          <div className="mb-8 flex flex-wrap gap-3">
+            <Link
+              href="/intake"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Add Message
+            </Link>
+            <Link
+              href="/pipeline"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              View Pipeline
+            </Link>
+            <Link
+              href="/today"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Today
+            </Link>
+            <LoadDemoButton />
+          </div>
+        </>
+      )}
+
+      {!user && (
+        <div className="mb-8">
+          <Link
+            href="/login"
+            className="inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Get started — Sign in
+          </Link>
+        </div>
+      )}
 
       <h2 className="mb-4 text-lg font-semibold text-slate-900">How it works</h2>
       <div className="grid gap-4 sm:grid-cols-2">

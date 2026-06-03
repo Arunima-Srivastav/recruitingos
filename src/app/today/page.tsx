@@ -7,7 +7,6 @@ import EmptyState from "@/components/EmptyState";
 import { getSupabaseConfigError } from "@/lib/config";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
-import { DEMO_USER_ID } from "@/lib/constants";
 import type { ActionWithOpportunity, Opportunity } from "@/lib/types";
 
 export default function TodayPage() {
@@ -32,7 +31,6 @@ export default function TodayPage() {
       const { data, error: fetchError } = await supabase
         .from("actions")
         .select("*, opportunity:opportunities(*)")
-        .eq("user_id", DEMO_USER_ID)
         .eq("status", "pending")
         .order("priority_score", { ascending: false });
       if (fetchError) throw fetchError;

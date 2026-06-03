@@ -1,5 +1,3 @@
-import { isSupabaseAdminConfigured } from "@/lib/supabase-admin";
-
 export const GMAIL_READONLY_SCOPE =
   "https://www.googleapis.com/auth/gmail.readonly";
 
@@ -27,9 +25,6 @@ export function isGoogleConfigured(): boolean {
 export function getGoogleConfigError(): string | null {
   if (!isGoogleConfigured()) {
     return "Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local.";
-  }
-  if (!isSupabaseAdminConfigured()) {
-    return "Gmail sync requires SUPABASE_SERVICE_ROLE_KEY in .env.local to store OAuth tokens securely.";
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { normalizeReviewedExtraction } from "@/lib/ai/extract";
 import { mockExtract } from "@/lib/mockExtractor";
@@ -32,8 +33,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to process message";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to process message");
   }
 }

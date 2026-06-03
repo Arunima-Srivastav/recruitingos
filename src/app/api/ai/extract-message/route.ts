@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { extractRecruitingMessage } from "@/lib/ai/extract";
 
@@ -28,8 +29,6 @@ export async function POST(request: Request) {
       model: result.model,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to extract message";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to extract message");
   }
 }

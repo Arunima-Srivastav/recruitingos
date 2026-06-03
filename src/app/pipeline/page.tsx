@@ -9,7 +9,6 @@ import Link from "next/link";
 import { STAGES } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
 import type { Opportunity } from "@/lib/types";
-import { DEMO_USER_ID } from "@/lib/constants";
 
 export default function PipelinePage() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -33,7 +32,6 @@ export default function PipelinePage() {
       const { data, error: fetchError } = await supabase
         .from("opportunities")
         .select("*")
-        .eq("user_id", DEMO_USER_ID)
         .order("priority_score", { ascending: false });
       if (fetchError) throw fetchError;
       setOpportunities((data ?? []) as Opportunity[]);

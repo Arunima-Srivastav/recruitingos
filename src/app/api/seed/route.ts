@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import {
   createAction,
@@ -153,8 +154,6 @@ export async function POST() {
       opportunity_ids: ids,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to seed demo data";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to seed demo data");
   }
 }

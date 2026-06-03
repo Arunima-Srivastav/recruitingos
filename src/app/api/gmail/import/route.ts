@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { extractRecruitingMessage } from "@/lib/ai/extract";
 import { fetchGmailMessage } from "@/lib/google/gmail";
@@ -79,8 +80,6 @@ export async function POST(request: Request) {
       results,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to import Gmail messages";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to import Gmail messages");
   }
 }

@@ -1,5 +1,5 @@
-import { DEMO_USER_ID } from "@/lib/constants";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { requireUser } from "@/lib/auth/server";
+import { createClient } from "@/lib/supabase/server";
 import { getGoogleConfig, GMAIL_READONLY_SCOPE } from "./config";
 
 export interface GoogleConnection {
@@ -20,6 +20,12 @@ interface TokenResponse {
   refresh_token?: string;
   scope?: string;
   token_type?: string;
+}
+
+async function authContext() {
+  const supabase = await createClient();
+  const user = await requireUser();
+  return { supabase, userId: user.id };
 }
 
 export function buildGoogleAuthUrl(state: string): string {
@@ -108,11 +114,11 @@ export async function saveGoogleConnection(input: {
   scopes?: string;
   googleEmail?: string | null;
 }): Promise<GoogleConnection> {
-  const supabase = getSupabaseAdmin();
+  const { supabase, userId } = await authContext();
   const expiresAt = new Date(Date.now() + input.expiresIn * 1000).toISOString();
 
   const row = {
-    user_id: DEMO_USER_ID,
+    user_id: userId,
     google_email: input.googleEmail ?? null,
     access_token: input.accessToken,
     refresh_token: input.refreshToken ?? null,
@@ -132,11 +138,11 @@ export async function saveGoogleConnection(input: {
 }
 
 export async function getGoogleConnection(): Promise<GoogleConnection | null> {
-  const supabase = getSupabaseAdmin();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("google_connections")
     .select("*")
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -144,11 +150,11 @@ export async function getGoogleConnection(): Promise<GoogleConnection | null> {
 }
 
 export async function deleteGoogleConnection(): Promise<void> {
-  const supabase = getSupabaseAdmin();
+  const { supabase, userId } = await authContext();
   const { error } = await supabase
     .from("google_connections")
     .delete()
-    .eq("user_id", DEMO_USER_ID);
+    .eq("user_id", userId);
   if (error) throw error;
 }
 

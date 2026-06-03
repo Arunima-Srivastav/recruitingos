@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { markActionComplete } from "@/lib/db";
 
@@ -16,8 +17,6 @@ export async function POST(request: Request) {
     await markActionComplete(action_id);
     return NextResponse.json({ success: true });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to complete action";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to complete action");
   }
 }

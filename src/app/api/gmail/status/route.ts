@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { getGoogleConfigError } from "@/lib/google/config";
 import { getGoogleConnection } from "@/lib/google/oauth";
@@ -23,8 +24,6 @@ export async function GET() {
       updated_at: connection?.updated_at ?? null,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to load Gmail status";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "Failed to load Gmail status");
   }
 }

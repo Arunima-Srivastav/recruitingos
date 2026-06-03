@@ -9,7 +9,6 @@ import { getSupabaseConfigError } from "@/lib/config";
 import { STAGES, TONES } from "@/lib/constants";
 import type { Tone } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
-import { DEMO_USER_ID } from "@/lib/constants";
 import type { Action, Draft, Message, Opportunity } from "@/lib/types";
 import { STAGE_COLORS } from "@/lib/constants";
 import { formatDate, cn, formatMessageBody } from "@/lib/utils";
@@ -47,7 +46,6 @@ export default function OpportunityDetailPage() {
           .from("opportunities")
           .select("*")
           .eq("id", id)
-          .eq("user_id", DEMO_USER_ID)
           .single(),
         supabase
           .from("messages")

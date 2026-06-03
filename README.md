@@ -26,7 +26,8 @@ Students get recruiting information from everywhere — Gmail, LinkedIn, job pos
 - Opportunity detail page with messages, extracted JSON, drafts, and actions
 - Mock draft generation for replies, follow-ups, and scheduling
 - Gmail import with scan preview and selective import (read-only OAuth)
-- Demo data seed endpoint
+- Supabase Auth (email/password) with per-user data isolation via RLS
+- Demo data seed endpoint (requires sign-in)
 
 ## Prerequisites
 
@@ -71,7 +72,6 @@ Gmail import also requires:
 
 | Variable | Description |
 |----------|-------------|
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (stores OAuth tokens server-side) |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | e.g. `http://localhost:3000/api/auth/google/callback` |
@@ -79,18 +79,27 @@ Gmail import also requires:
 
 Find Supabase values under **Project Settings → API**.
 
-### 3. Set up the database
+### 3. Set up the database and auth
 
-In your Supabase project, open **SQL Editor** and run the full contents of [`supabase/schema.sql`](supabase/schema.sql). This creates:
+In your Supabase project:
+
+1. Open **Authentication → Providers** and enable **Email** (disable email confirmation for local dev if you want instant sign-in).
+2. Open **SQL Editor** and run the full contents of [`supabase/schema.sql`](supabase/schema.sql). This creates:
 
 - `opportunities` — company, role, stage, deadlines, priority
 - `messages` — raw text plus extracted JSON
 - `actions` — pending tasks linked to opportunities
 - `drafts` — generated reply templates
+- `google_connections` — Gmail OAuth tokens (per user)
 
-The MVP uses open RLS policies for demo access (`demo-user`). Replace with real auth before production.
+The schema includes **per-user RLS** policies (`auth.uid()::text = user_id`). Each signed-in user only sees their own rows.
 
-If you already ran an older `schema.sql`, also run [`supabase/migrations/002_gmail.sql`](supabase/migrations/002_gmail.sql) for Gmail tables and message fields.
+If you already ran an older `schema.sql` with open MVP policies, also run:
+
+- [`supabase/migrations/002_gmail.sql`](supabase/migrations/002_gmail.sql) — Gmail tables and message fields
+- [`supabase/migrations/003_auth_rls.sql`](supabase/migrations/003_auth_rls.sql) — replace MVP policies with user-scoped RLS
+
+**Note:** Data created under the old `demo-user` id will not appear after you sign in with a real account.
 
 ### 4. Run the app
 
@@ -98,7 +107,7 @@ If you already ran an older `schema.sql`, also run [`supabase/migrations/002_gma
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000), then **Sign in** (or create an account) to access the pipeline, intake, Gmail, and Today views.
 
 ### 5. Verify the build (optional)
 
@@ -109,22 +118,19 @@ npm start
 
 ## Seed demo data
 
-Click **Load Demo Data** on the homepage, which calls `POST /api/seed` and redirects you to `/pipeline` with five sample opportunities. Or call it directly:
+Sign in first, then click **Load Demo Data** on the homepage. It calls `POST /api/seed` and redirects you to `/pipeline` with five sample opportunities.
 
-```bash
-curl -X POST http://localhost:3000/api/seed
-```
-
-The seed endpoint is idempotent: if five or more opportunities already exist, it skips re-seeding.
+The seed endpoint is idempotent: if five or more opportunities already exist for your account, it skips re-seeding.
 
 ## Core user flow
 
-1. **Dashboard** (`/`) — overview stats and quick links
-2. **Add Message** (`/intake`) — paste message → Ollama extraction → review → save
-3. **Gmail** (`/gmail`) — connect Gmail → scan → preview → import selected messages
-4. **Pipeline** (`/pipeline`) — kanban board grouped by stage
-5. **Today** (`/today`) — prioritized pending actions
-6. **Opportunity detail** (`/opportunities/[id]`) — stage updates, drafts, actions, messages
+1. **Dashboard** (`/`) — overview stats and quick links (sign in required for stats)
+2. **Sign in** (`/login`) — email/password auth
+3. **Add Message** (`/intake`) — paste message → Ollama extraction → review → save
+4. **Gmail** (`/gmail`) — connect Gmail → scan → preview → import selected messages
+5. **Pipeline** (`/pipeline`) — kanban board grouped by stage
+6. **Today** (`/today`) — prioritized pending actions
+7. **Opportunity detail** (`/opportunities/[id]`) — stage updates, drafts, actions, messages
 
 ## Project structure
 
@@ -145,8 +151,10 @@ src/
     ai/               # Ollama client, schemas, extraction
     mockDraftGenerator.ts
     prioritizer.ts
-    db.ts             # Supabase data access
+    db.ts             # Supabase data access (scoped to signed-in user)
     config.ts         # Env var validation
+    auth/             # getCurrentUser, requireUser, API error helpers
+    supabase/         # Browser, server, and middleware Supabase clients
 supabase/
   schema.sql          # Database schema
 ```
@@ -170,7 +178,6 @@ supabase/
 
 ## Current limitations
 
-- No real authentication (`demo-user` is hardcoded)
 - Gmail is user-triggered scan only (no automatic recurring sync yet)
 - Google Calendar not integrated yet
 - Extraction falls back to regex/keyword heuristics if Ollama fails or is not configured
@@ -203,17 +210,16 @@ Without `OLLAMA_API_KEY`, intake still works using the heuristic fallback parser
 4. Add to `.env.local`:
 
 ```env
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-5. Run `supabase/migrations/002_gmail.sql` in Supabase SQL Editor (if upgrading an existing DB).
-6. Open **Gmail** in the app → **Connect Gmail** → **Scan Gmail** → select messages → **Import selected**.
+5. Run `supabase/migrations/002_gmail.sql` and `003_auth_rls.sql` in Supabase SQL Editor (if upgrading an existing DB).
+6. **Sign in** to the app, then open **Gmail** → **Connect Gmail** → **Scan Gmail** → select messages → **Import selected**.
 
-OAuth scope: `gmail.readonly` only. Tokens are stored in Supabase via the service role key (not exposed to the browser).
+OAuth scope: `gmail.readonly` only. Tokens are stored in Supabase per user (RLS-protected, not exposed to the browser).
 
 ## Future work
 
@@ -227,8 +233,11 @@ OAuth scope: `gmail.readonly` only. Tokens are stored in Supabase via the servic
 | Problem | Fix |
 |---------|-----|
 | "Missing Supabase configuration" banner | Copy `.env.example` → `.env.local` and set both `NEXT_PUBLIC_*` vars |
-| Seed or intake returns 500 | Confirm `schema.sql` was run in Supabase SQL Editor |
+| Redirected to `/login` on every page | Sign in or create an account; protected routes require auth |
+| Empty pipeline after sign-in | Old `demo-user` data is not linked to your account — use **Load Demo Data** or add messages |
+| Seed or intake returns 401 | Sign in first; API routes require an active session |
+| Seed or intake returns 500 | Confirm `schema.sql` (and `003_auth_rls.sql` if upgrading) was run in Supabase SQL Editor |
 | Empty pipeline after seed | Check browser console; verify RLS policies exist in Supabase |
 | Build fails | Run `npm install` then `npm run build`; ensure Node 20+ |
-| Gmail connect fails | Check redirect URI matches Google Console exactly |
-| Gmail status shows service role error | Add `SUPABASE_SERVICE_ROLE_KEY` and run `002_gmail.sql` |
+| Gmail connect fails | Sign in first, then connect; check redirect URI matches Google Console exactly |
+| Sign up does nothing | Enable Email provider in Supabase Auth; disable confirmation for local dev if needed |

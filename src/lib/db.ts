@@ -1,5 +1,5 @@
-import { DEMO_USER_ID } from "./constants";
-import { getSupabase } from "./supabase";
+import { requireUser } from "@/lib/auth/server";
+import { createClient } from "@/lib/supabase/server";
 import type {
   Action,
   ActionWithOpportunity,
@@ -8,15 +8,19 @@ import type {
   Opportunity,
 } from "./types";
 
+async function authContext() {
+  const supabase = await createClient();
+  const user = await requireUser();
+  return { supabase, userId: user.id };
+}
+
 export async function createOpportunity(
-  data: Omit<Opportunity, "id" | "created_at" | "updated_at" | "user_id"> & {
-    user_id?: string;
-  }
+  data: Omit<Opportunity, "id" | "created_at" | "updated_at" | "user_id">
 ): Promise<Opportunity> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data: row, error } = await supabase
     .from("opportunities")
-    .insert({ ...data, user_id: data.user_id ?? DEMO_USER_ID })
+    .insert({ ...data, user_id: userId })
     .select()
     .single();
   if (error) throw error;
@@ -24,11 +28,11 @@ export async function createOpportunity(
 }
 
 export async function getOpportunities(): Promise<Opportunity[]> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("opportunities")
     .select("*")
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .order("priority_score", { ascending: false })
     .order("updated_at", { ascending: false });
   if (error) throw error;
@@ -36,12 +40,12 @@ export async function getOpportunities(): Promise<Opportunity[]> {
 }
 
 export async function getOpportunityById(id: string): Promise<Opportunity | null> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("opportunities")
     .select("*")
     .eq("id", id)
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .single();
   if (error) {
     if (error.code === "PGRST116") return null;
@@ -54,12 +58,12 @@ export async function updateOpportunityStage(
   id: string,
   stage: string
 ): Promise<Opportunity> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("opportunities")
     .update({ stage, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error) throw error;
@@ -67,22 +71,22 @@ export async function updateOpportunityStage(
 }
 
 export async function deleteOpportunity(id: string): Promise<void> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { error } = await supabase
     .from("opportunities")
     .delete()
     .eq("id", id)
-    .eq("user_id", DEMO_USER_ID);
+    .eq("user_id", userId);
   if (error) throw error;
 }
 
 export async function createMessage(
-  data: Omit<Message, "id" | "created_at" | "user_id"> & { user_id?: string }
+  data: Omit<Message, "id" | "created_at" | "user_id">
 ): Promise<Message> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data: row, error } = await supabase
     .from("messages")
-    .insert({ ...data, user_id: data.user_id ?? DEMO_USER_ID })
+    .insert({ ...data, user_id: userId })
     .select()
     .single();
   if (error) throw error;
@@ -92,12 +96,12 @@ export async function createMessage(
 export async function getMessagesForOpportunity(
   opportunityId: string
 ): Promise<Message[]> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("messages")
     .select("*")
     .eq("opportunity_id", opportunityId)
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Message[];
@@ -105,16 +109,15 @@ export async function getMessagesForOpportunity(
 
 export async function createAction(
   data: Omit<Action, "id" | "created_at" | "user_id" | "status"> & {
-    user_id?: string;
     status?: string;
   }
 ): Promise<Action> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data: row, error } = await supabase
     .from("actions")
     .insert({
       ...data,
-      user_id: data.user_id ?? DEMO_USER_ID,
+      user_id: userId,
       status: data.status ?? "pending",
     })
     .select()
@@ -124,11 +127,11 @@ export async function createAction(
 }
 
 export async function getPendingActions(): Promise<ActionWithOpportunity[]> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("actions")
     .select("*, opportunity:opportunities(*)")
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .eq("status", "pending")
     .order("priority_score", { ascending: false });
   if (error) throw error;
@@ -141,12 +144,12 @@ export async function getPendingActions(): Promise<ActionWithOpportunity[]> {
 }
 
 export async function markActionComplete(actionId: string): Promise<Action> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("actions")
     .update({ status: "completed" })
     .eq("id", actionId)
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .select()
     .single();
   if (error) throw error;
@@ -154,12 +157,12 @@ export async function markActionComplete(actionId: string): Promise<Action> {
 }
 
 export async function createDraft(
-  data: Omit<Draft, "id" | "created_at" | "user_id"> & { user_id?: string }
+  data: Omit<Draft, "id" | "created_at" | "user_id">
 ): Promise<Draft> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data: row, error } = await supabase
     .from("drafts")
-    .insert({ ...data, user_id: data.user_id ?? DEMO_USER_ID })
+    .insert({ ...data, user_id: userId })
     .select()
     .single();
   if (error) throw error;
@@ -169,12 +172,12 @@ export async function createDraft(
 export async function getDraftsForOpportunity(
   opportunityId: string
 ): Promise<Draft[]> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("drafts")
     .select("*")
     .eq("opportunity_id", opportunityId)
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Draft[];
@@ -183,33 +186,33 @@ export async function getDraftsForOpportunity(
 export async function getActionsForOpportunity(
   opportunityId: string
 ): Promise<Action[]> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("actions")
     .select("*")
     .eq("opportunity_id", opportunityId)
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Action[];
 }
 
 export async function countOpportunities(): Promise<number> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { count, error } = await supabase
     .from("opportunities")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", DEMO_USER_ID);
+    .eq("user_id", userId);
   if (error) throw error;
   return count ?? 0;
 }
 
 export async function countPendingActions(): Promise<number> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { count, error } = await supabase
     .from("actions")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .eq("status", "pending");
   if (error) throw error;
   return count ?? 0;
@@ -221,11 +224,11 @@ export async function hasSeedData(): Promise<boolean> {
 }
 
 export async function getImportedGmailMessageIds(): Promise<Set<string>> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("messages")
     .select("external_message_id")
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .eq("source", "gmail")
     .not("external_message_id", "is", null);
 
@@ -241,11 +244,11 @@ export async function getImportedGmailMessageIds(): Promise<Set<string>> {
 export async function getMessageByExternalId(
   externalMessageId: string
 ): Promise<Message | null> {
-  const supabase = getSupabase();
+  const { supabase, userId } = await authContext();
   const { data, error } = await supabase
     .from("messages")
     .select("*")
-    .eq("user_id", DEMO_USER_ID)
+    .eq("user_id", userId)
     .eq("external_message_id", externalMessageId)
     .maybeSingle();
 
