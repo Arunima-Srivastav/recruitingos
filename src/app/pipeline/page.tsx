@@ -15,6 +15,7 @@ export default function PipelinePage() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchOpportunities = useCallback(async () => {
     setLoading(true);
@@ -61,6 +62,35 @@ export default function PipelinePage() {
       setOpportunities((prev) =>
         prev.map((o) => (o.id === id ? { ...o, stage } : o))
       );
+    }
+  }
+
+  async function handleDelete(id: string) {
+    const opp = opportunities.find((o) => o.id === id);
+    const label = opp?.company ?? "this opportunity";
+    if (
+      !window.confirm(
+        `Delete ${label}? This removes linked messages, actions, and drafts.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/api/opportunities/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunity_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      setOpportunities((prev) => prev.filter((o) => o.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -128,6 +158,8 @@ export default function PipelinePage() {
               stage={stage}
               opportunities={grouped[stage] ?? []}
               onStageChange={handleStageChange}
+              onDelete={handleDelete}
+              deletingId={deletingId}
             />
           ))}
         </div>

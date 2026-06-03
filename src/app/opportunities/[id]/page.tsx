@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import DraftCard from "@/components/DraftCard";
@@ -12,10 +12,11 @@ import { getSupabase } from "@/lib/supabase";
 import { DEMO_USER_ID } from "@/lib/constants";
 import type { Action, Draft, Message, Opportunity } from "@/lib/types";
 import { STAGE_COLORS } from "@/lib/constants";
-import { formatDate, cn } from "@/lib/utils";
+import { formatDate, cn, formatMessageBody } from "@/lib/utils";
 
 export default function OpportunityDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
@@ -26,6 +27,7 @@ export default function OpportunityDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [tone, setTone] = useState<Tone>("professional");
   const [generating, setGenerating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -127,6 +129,33 @@ export default function OpportunityDetailPage() {
     }
   }
 
+  async function handleDelete() {
+    if (
+      !window.confirm(
+        `Delete ${opportunity?.company ?? "this opportunity"}? This removes linked messages, actions, and drafts.`
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/opportunities/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunity_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      router.push("/pipeline");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="px-4 py-8 text-slate-500 sm:px-6">
@@ -218,6 +247,14 @@ export default function OpportunityDetailPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="rounded-md border border-red-200 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deleting ? "Deleting..." : "Delete"}
+          </button>
         </div>
       </div>
 
@@ -322,11 +359,16 @@ export default function OpportunityDetailPage() {
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
                 <p className="text-xs text-slate-500">
-                  {msg.sender_name ?? "Unknown"} · {msg.source} ·{" "}
-                  {formatDate(msg.created_at)}
+                  {msg.sender_name ?? msg.sender_email ?? "Unknown sender"} ·{" "}
+                  {msg.source} · {formatDate(msg.received_at ?? msg.created_at)}
                 </p>
+                {msg.subject && (
+                  <p className="mt-2 text-sm font-medium text-slate-800">
+                    {msg.subject}
+                  </p>
+                )}
                 <pre className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                  {msg.body}
+                  {formatMessageBody(msg.body)}
                 </pre>
                 {msg.extracted_json && (
                   <details className="mt-3">

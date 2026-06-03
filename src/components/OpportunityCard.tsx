@@ -8,12 +8,16 @@ import { formatDate, formatRelative, cn } from "@/lib/utils";
 interface Props {
   opportunity: Opportunity;
   onStageChange?: (stage: string) => void;
+  onDelete?: () => void;
+  deleting?: boolean;
   showStageSelect?: boolean;
 }
 
 export default function OpportunityCard({
   opportunity,
   onStageChange,
+  onDelete,
+  deleting,
   showStageSelect = false,
 }: Props) {
   const stageColor =
@@ -58,18 +62,34 @@ export default function OpportunityCard({
         </p>
       </Link>
       {showStageSelect && onStageChange && (
-        <select
-          className="mt-3 w-full rounded-md border border-slate-200 px-2 py-1 text-xs"
-          value={opportunity.stage}
-          onChange={(e) => onStageChange(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {STAGES.map((stage) => (
-            <option key={stage} value={stage}>
-              {stage}
-            </option>
-          ))}
-        </select>
+        <div className="mt-3 flex items-center gap-2">
+          <select
+            className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs"
+            value={opportunity.stage}
+            onChange={(e) => onStageChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {STAGES.map((stage) => (
+              <option key={stage} value={stage}>
+                {stage}
+              </option>
+            ))}
+          </select>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete();
+              }}
+              disabled={deleting}
+              className="shrink-0 rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              {deleting ? "..." : "Delete"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

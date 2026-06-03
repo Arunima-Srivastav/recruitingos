@@ -27,3 +27,32 @@ export function formatRelative(dateStr: string | null | undefined): string {
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
+
+/** Render stored message bodies as readable text (handles legacy HTML imports). */
+export function formatMessageBody(body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed) return trimmed;
+  if (/^\s*</.test(trimmed) || /<!DOCTYPE/i.test(trimmed)) {
+    return stripHtmlToPlainText(trimmed);
+  }
+  return trimmed;
+}
+
+function stripHtmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}

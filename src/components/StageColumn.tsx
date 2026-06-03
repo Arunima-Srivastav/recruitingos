@@ -7,12 +7,16 @@ interface Props {
   stage: string;
   opportunities: Opportunity[];
   onStageChange: (id: string, stage: string) => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
 }
 
 export default function StageColumn({
   stage,
   opportunities,
   onStageChange,
+  onDelete,
+  deletingId,
 }: Props) {
   const stageColor =
     STAGE_COLORS[stage] ?? "bg-slate-100 text-slate-700";
@@ -42,6 +46,8 @@ export default function StageColumn({
               opportunity={opp}
               showStageSelect
               onStageChange={(newStage) => onStageChange(opp.id, newStage)}
+              onDelete={() => onDelete(opp.id)}
+              deleting={deletingId === opp.id}
             />
           ))
         )}
