@@ -66,6 +66,16 @@ export async function updateOpportunityStage(
   return data as Opportunity;
 }
 
+export async function deleteOpportunity(id: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("opportunities")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", DEMO_USER_ID);
+  if (error) throw error;
+}
+
 export async function createMessage(
   data: Omit<Message, "id" | "created_at" | "user_id"> & { user_id?: string }
 ): Promise<Message> {
@@ -208,4 +218,37 @@ export async function countPendingActions(): Promise<number> {
 export async function hasSeedData(): Promise<boolean> {
   const count = await countOpportunities();
   return count >= 5;
+}
+
+export async function getImportedGmailMessageIds(): Promise<Set<string>> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("external_message_id")
+    .eq("user_id", DEMO_USER_ID)
+    .eq("source", "gmail")
+    .not("external_message_id", "is", null);
+
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .map((row) => row.external_message_id as string | null)
+      .filter((id): id is string => Boolean(id))
+  );
+}
+
+export async function getMessageByExternalId(
+  externalMessageId: string
+): Promise<Message | null> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("user_id", DEMO_USER_ID)
+    .eq("external_message_id", externalMessageId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as Message | null) ?? null;
 }

@@ -25,6 +25,10 @@ export interface Message {
   received_at: string | null;
   extracted_json: ExtractedRecruitingData | null;
   external_message_id: string | null;
+  snippet?: string | null;
+  extraction_status?: string | null;
+  extraction_confidence?: number | null;
+  needs_review?: boolean | null;
   created_at: string;
 }
 
