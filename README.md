@@ -4,7 +4,7 @@
 
 Recruiting OS helps students manage the end-to-end recruiting process by converting scattered recruiting-related information into a structured opportunity pipeline.
 
-Students get recruiting information from everywhere : Gmail, LinkedIn, job postings, OAs, interview scheduling, follow-ups, rejections, offers. This app ingests those messages, extracts structured data, classifies pipeline stage, generates next actions and draft replies, and surfaces what matters **today**.
+Students get recruiting information from everywhere — Gmail, LinkedIn, job postings, OAs, interview scheduling, follow-ups, rejections, offers. This app ingests those messages, extracts structured data, classifies pipeline stage, generates next actions and draft replies, and surfaces what matters **today**.
 
 ## Tech stack
 
@@ -12,7 +12,7 @@ Students get recruiting information from everywhere : Gmail, LinkedIn, job posti
 - **Tailwind CSS**
 - **Supabase** (Postgres)
 - **Next.js API routes** for backend logic
-- Mock extraction & draft generation (swap for LLM later)
+- **Heuristic extraction & mock draft generation** (MVP — LLM integration planned)
 
 ## MVP features
 
@@ -21,88 +21,143 @@ Students get recruiting information from everywhere : Gmail, LinkedIn, job posti
 - Supabase-backed opportunities, messages, actions, and drafts
 - Kanban-style pipeline board with stage updates
 - Today view with prioritized pending actions
-- Opportunity detail page with messages, JSON, drafts, and actions
+- Opportunity detail page with messages, extracted JSON, drafts, and actions
 - Mock draft generation for replies, follow-ups, and scheduling
 - Demo data seed endpoint
 
-## Environment variables
+## Prerequisites
 
-Create `.env.local` in the project root (see [`.env.example`](.env.example) for a template):
+- Node.js 20+
+- npm
+- A [Supabase](https://supabase.com) project (free tier is fine)
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
+## Local setup
 
-These are in Supabase under **Project Settings → API**.
-
-## Run locally
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/Arunima-Srivastav/recruitingos.git
+cd recruitingos
 npm install
+```
+
+### 2. Configure environment variables
+
+Copy the example file and fill in your Supabase credentials:
+
+```bash
+cp .env.example .env.local
+```
+
+Required variables:
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+
+Find both in Supabase under **Project Settings → API**.
+
+### 3. Set up the database
+
+In your Supabase project, open **SQL Editor** and run the full contents of [`supabase/schema.sql`](supabase/schema.sql). This creates:
+
+- `opportunities` — company, role, stage, deadlines, priority
+- `messages` — raw text plus extracted JSON
+- `actions` — pending tasks linked to opportunities
+- `drafts` — generated reply templates
+
+The MVP uses open RLS policies for demo access (`demo-user`). Replace with real auth before production.
+
+### 4. Run the app
+
+```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### 5. Verify the build (optional)
+
+```bash
+npm run build
+npm start
+```
+
 ## Seed demo data
 
-Click **Load Demo Data** on the homepage, which calls `POST /api/seed` and redirects you to `/pipeline` with sample opportunities already populated. Or call it directly:
+Click **Load Demo Data** on the homepage, which calls `POST /api/seed` and redirects you to `/pipeline` with five sample opportunities. Or call it directly:
 
 ```bash
 curl -X POST http://localhost:3000/api/seed
 ```
 
+The seed endpoint is idempotent: if five or more opportunities already exist, it skips re-seeding.
+
 ## Core user flow
 
-1. Open app → **Add Message**
-2. Paste a recruiter message → **Process Message**
-3. View the extracted opportunity on its detail page
-4. Generate a draft reply, follow-up, or scheduling response
-5. Browse **Pipeline** and **Today**
-6. Mark actions complete and update stages as things move
-
-## Current limitations
-
-- No real authentication (`demo-user` is hardcoded)
-- No Gmail or Google Calendar integration yet
-- Extraction and reply generation are heuristic, not LLM-based
-- The heuristic parser will misclassify edge cases
-- Scheduling availability is placeholder text
-
-## Future work
-
-- Google OAuth login and multi-user auth with per-user RLS policies
-- Google Calendar integration for real scheduling availability
-- Real LLM structured extraction and reply generation with tone control
-- Smarter prioritization, reminders, and notifications
-
-### Opportunity sourcing 
-
-The MVP only supports **manual paste** intake. Next we want a real **sourcing layer** that feeds the same pipeline:
-
-- **Gmail API** — sync recruiter threads, OAs, scheduling, rejections, and offers into `messages` automatically
-- **LinkedIn** — manual paste for now; later export/import or approved integrations where feasible
-- **Job posts** — paste or URL capture → extract company, role, and deadlines into new or existing opportunities
-- **Deduping & linking** — match incoming messages to existing opportunities (company + role + recruiter) instead of creating duplicates
-- **Backfill** — one-time import of a recruiting inbox so students start with a populated pipeline
-
-Sourcing should enqueue work (parse → classify → prioritize) rather than blocking the UI on large imports.
-
-### Compute usage
-
-- **Cloudflare Workers AI** — structured extraction and stage classification on intake (and on each Gmail sync event); on-demand draft generation for replies, follow-ups, and scheduling. Drafts cached in Supabase to avoid repeat inference.
-- **DigitalOcean** — async Gmail sync and inbox backfill (poll/webhook worker + queue, batch re-processing). Keeps long jobs off the request path.
-
-Interactive actions stay on the edge; bulk work runs async. The MVP uses heuristics in Next.js API routes with no model calls until this is wired up.
+1. **Dashboard** (`/`) — overview stats and quick links
+2. **Add Message** (`/intake`) — paste a recruiting message → heuristic extraction → new opportunity
+3. **Pipeline** (`/pipeline`) — kanban board grouped by stage
+4. **Today** (`/today`) — prioritized pending actions
+5. **Opportunity detail** (`/opportunities/[id]`) — stage updates, drafts, actions, original messages
 
 ## Project structure
 
 ```
 src/
-  app/           # Pages and API routes
-  components/    # UI components
-  lib/           # Supabase, mock extractors, prioritizer
+  app/              # Pages and API routes
+    api/intake/       # POST message → extract → create opportunity
+    api/seed/         # POST demo data
+    api/drafts/       # POST mock draft generation
+    intake/           # Manual message paste
+    pipeline/         # Kanban board
+    today/            # Prioritized actions
+    opportunities/    # Detail view
+  components/         # UI components
+  lib/
+    mockExtractor.ts  # Heuristic message parser (MVP)
+    mockDraftGenerator.ts
+    prioritizer.ts
+    db.ts             # Supabase data access
+    config.ts         # Env var validation
 supabase/
-  schema.sql     # Database schema
+  schema.sql          # Database schema
 ```
+
+## API routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/intake` | POST | Parse message, create opportunity + action |
+| `/api/seed` | POST | Load demo opportunities |
+| `/api/drafts/generate` | POST | Generate mock reply draft |
+| `/api/opportunities/update-stage` | POST | Move opportunity to a new stage |
+| `/api/actions/complete` | POST | Mark action as completed |
+
+## Current limitations
+
+- No real authentication (`demo-user` is hardcoded)
+- No Gmail or Google Calendar integration yet
+- Extraction uses regex/keyword heuristics, not an LLM — will misclassify edge cases
+- Draft generation is template-based, not AI-generated
+- Scheduling availability in drafts is placeholder text
+- If Supabase env vars are missing, pages show a setup banner instead of crashing
+
+## Future work
+
+- Ollama Cloud for structured extraction and draft generation
+- Google OAuth + Gmail import with review screen
+- Google Calendar / iCal export
+- Discover page for public GitHub job sources (e.g. SimplifyJobs)
+- Evaluation harness with labeled test set
+- DigitalOcean App Platform deployment
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| "Missing Supabase configuration" banner | Copy `.env.example` → `.env.local` and set both `NEXT_PUBLIC_*` vars |
+| Seed or intake returns 500 | Confirm `schema.sql` was run in Supabase SQL Editor |
+| Empty pipeline after seed | Check browser console; verify RLS policies exist in Supabase |
+| Build fails | Run `npm install` then `npm run build`; ensure Node 20+ |
