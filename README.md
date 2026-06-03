@@ -25,6 +25,7 @@ Students get recruiting information from everywhere — Gmail, LinkedIn, job pos
 - Today view with prioritized pending actions
 - Opportunity detail page with messages, extracted JSON, drafts, and actions
 - Mock draft generation for replies, follow-ups, and scheduling
+- Gmail import with scan preview and selective import (read-only OAuth)
 - Demo data seed endpoint
 
 ## Prerequisites
@@ -64,7 +65,17 @@ Optional for AI extraction (falls back to heuristics without these):
 |----------|-------------|
 | `OLLAMA_API_KEY` | API key from [ollama.com](https://ollama.com) → Settings → Keys |
 | `OLLAMA_BASE_URL` | Ollama Cloud API host (default: `https://ollama.com`) |
-| `OLLAMA_MODEL` | Cloud model from your API (`curl https://ollama.com/api/tags`) — default `ministral-3:3b` |
+| `OLLAMA_MODEL` | Cloud model from your API — default `ministral-3:3b` |
+
+Gmail import also requires:
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (stores OAuth tokens server-side) |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | e.g. `http://localhost:3000/api/auth/google/callback` |
+| `NEXT_PUBLIC_APP_URL` | e.g. `http://localhost:3000` |
 
 Find Supabase values under **Project Settings → API**.
 
@@ -78,6 +89,8 @@ In your Supabase project, open **SQL Editor** and run the full contents of [`sup
 - `drafts` — generated reply templates
 
 The MVP uses open RLS policies for demo access (`demo-user`). Replace with real auth before production.
+
+If you already ran an older `schema.sql`, also run [`supabase/migrations/002_gmail.sql`](supabase/migrations/002_gmail.sql) for Gmail tables and message fields.
 
 ### 4. Run the app
 
@@ -107,10 +120,11 @@ The seed endpoint is idempotent: if five or more opportunities already exist, it
 ## Core user flow
 
 1. **Dashboard** (`/`) — overview stats and quick links
-2. **Add Message** (`/intake`) — paste message → Ollama extraction → review fields → save to pipeline
-3. **Pipeline** (`/pipeline`) — kanban board grouped by stage
-4. **Today** (`/today`) — prioritized pending actions
-5. **Opportunity detail** (`/opportunities/[id]`) — stage updates, drafts, actions, original messages
+2. **Add Message** (`/intake`) — paste message → Ollama extraction → review → save
+3. **Gmail** (`/gmail`) — connect Gmail → scan → preview → import selected messages
+4. **Pipeline** (`/pipeline`) — kanban board grouped by stage
+5. **Today** (`/today`) — prioritized pending actions
+6. **Opportunity detail** (`/opportunities/[id]`) — stage updates, drafts, actions, messages
 
 ## Project structure
 
@@ -147,11 +161,18 @@ supabase/
 | `/api/drafts/generate` | POST | Generate mock reply draft |
 | `/api/opportunities/update-stage` | POST | Move opportunity to a new stage |
 | `/api/actions/complete` | POST | Mark action as completed |
+| `/api/auth/google/start` | GET | Start Gmail OAuth |
+| `/api/auth/google/callback` | GET | OAuth callback |
+| `/api/gmail/status` | GET | Gmail connection status |
+| `/api/gmail/scan` | POST | Scan inbox for recruiting messages |
+| `/api/gmail/import` | POST | Import selected messages through Ollama |
+| `/api/gmail/disconnect` | POST | Disconnect Gmail |
 
 ## Current limitations
 
 - No real authentication (`demo-user` is hardcoded)
-- No Gmail or Google Calendar integration yet
+- Gmail is user-triggered scan only (no automatic recurring sync yet)
+- Google Calendar not integrated yet
 - Extraction falls back to regex/keyword heuristics if Ollama fails or is not configured
 - Draft generation is template-based, not AI-generated
 - Scheduling availability in drafts is placeholder text
@@ -174,9 +195,28 @@ OLLAMA_MODEL=ministral-3:3b
 
 Without `OLLAMA_API_KEY`, intake still works using the heuristic fallback parser.
 
+## Gmail setup
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create an OAuth 2.0 **Web application** client.
+2. Enable the **Gmail API** for your project.
+3. Add authorized redirect URI: `http://localhost:3000/api/auth/google/callback`
+4. Add to `.env.local`:
+
+```env
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+5. Run `supabase/migrations/002_gmail.sql` in Supabase SQL Editor (if upgrading an existing DB).
+6. Open **Gmail** in the app → **Connect Gmail** → **Scan Gmail** → select messages → **Import selected**.
+
+OAuth scope: `gmail.readonly` only. Tokens are stored in Supabase via the service role key (not exposed to the browser).
+
 ## Future work
 
-- Google OAuth + Gmail import with review screen
 - Google Calendar / iCal export
 - Discover page for public GitHub job sources (e.g. SimplifyJobs)
 - Evaluation harness with labeled test set
@@ -190,3 +230,5 @@ Without `OLLAMA_API_KEY`, intake still works using the heuristic fallback parser
 | Seed or intake returns 500 | Confirm `schema.sql` was run in Supabase SQL Editor |
 | Empty pipeline after seed | Check browser console; verify RLS policies exist in Supabase |
 | Build fails | Run `npm install` then `npm run build`; ensure Node 20+ |
+| Gmail connect fails | Check redirect URI matches Google Console exactly |
+| Gmail status shows service role error | Add `SUPABASE_SERVICE_ROLE_KEY` and run `002_gmail.sql` |
