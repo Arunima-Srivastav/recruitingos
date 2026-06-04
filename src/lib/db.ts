@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth/server";
+import { mergeOpportunityFields } from "@/lib/dedup/merge";
 import { createClient } from "@/lib/supabase/server";
 import type { CalendarEventLink, UserCalendarEvent } from "./calendar/types";
 import type {
@@ -97,6 +98,62 @@ export async function deleteOpportunity(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function mergeOpportunities(
+  primaryId: string,
+  secondaryId: string
+): Promise<Opportunity> {
+  if (primaryId === secondaryId) {
+    throw new Error("Cannot merge an opportunity with itself");
+  }
+
+  const primary = await getOpportunityById(primaryId);
+  const secondary = await getOpportunityById(secondaryId);
+  if (!primary || !secondary) {
+    throw new Error("Opportunity not found");
+  }
+
+  const { supabase, userId } = await authContext();
+  const mergedFields = mergeOpportunityFields(primary, secondary);
+
+  const reassign = async (table: "messages" | "actions" | "drafts") => {
+    const { error } = await supabase
+      .from(table)
+      .update({ opportunity_id: primaryId })
+      .eq("opportunity_id", secondaryId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  };
+
+  await reassign("messages");
+  await reassign("actions");
+  await reassign("drafts");
+
+  const { error: calendarError } = await supabase
+    .from("user_calendar_events")
+    .update({ opportunity_id: primaryId })
+    .eq("opportunity_id", secondaryId)
+    .eq("user_id", userId);
+  if (calendarError) throw calendarError;
+
+  const { data: updated, error: updateError } = await supabase
+    .from("opportunities")
+    .update(mergedFields)
+    .eq("id", primaryId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+  if (updateError) throw updateError;
+
+  const { error: deleteError } = await supabase
+    .from("opportunities")
+    .delete()
+    .eq("id", secondaryId)
+    .eq("user_id", userId);
+  if (deleteError) throw deleteError;
+
+  return updated as Opportunity;
+}
+
 export async function createMessage(
   data: Omit<Message, "id" | "created_at" | "user_id">
 ): Promise<Message> {
@@ -108,6 +165,17 @@ export async function createMessage(
     .single();
   if (error) throw error;
   return row as Message;
+}
+
+export async function getAllMessagesForUser(): Promise<Message[]> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Message[];
 }
 
 export async function getMessagesForOpportunity(
