@@ -72,6 +72,8 @@ create table if not exists google_connections (
   refresh_token text,
   token_expires_at timestamptz,
   scopes text,
+  calendar_sync_enabled boolean not null default false,
+  calendar_last_synced_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id)
@@ -131,4 +133,50 @@ create policy "drafts_delete_own" on drafts
   for delete using (auth.uid()::text = user_id);
 
 create policy "google_connections_own" on google_connections
+  for all using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
+
+create table if not exists calendar_event_links (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  source_kind text not null check (source_kind in ('deadline', 'action')),
+  source_id text not null,
+  google_event_id text not null,
+  google_calendar_id text not null default 'primary',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, source_kind, source_id)
+);
+
+create index if not exists idx_calendar_event_links_user_id
+  on calendar_event_links(user_id);
+
+alter table calendar_event_links enable row level security;
+
+create policy "calendar_event_links_own" on calendar_event_links
+  for all using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
+
+create table if not exists user_calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  title text not null,
+  description text,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  all_day boolean not null default true,
+  opportunity_id uuid references opportunities(id) on delete set null,
+  google_event_id text,
+  google_calendar_id text default 'primary',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_user_calendar_events_user_id
+  on user_calendar_events(user_id);
+
+create index if not exists idx_user_calendar_events_starts_at
+  on user_calendar_events(starts_at);
+
+alter table user_calendar_events enable row level security;
+
+create policy "user_calendar_events_own" on user_calendar_events
   for all using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
