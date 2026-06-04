@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/server";
 import { createClient } from "@/lib/supabase/server";
+import type { CalendarEventLink, UserCalendarEvent } from "./calendar/types";
 import type {
   Action,
   ActionWithOpportunity,
@@ -62,6 +63,22 @@ export async function updateOpportunityStage(
   const { data, error } = await supabase
     .from("opportunities")
     .update({ stage, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Opportunity;
+}
+
+export async function updateOpportunityDeadline(
+  id: string,
+  deadline: string | null
+): Promise<Opportunity> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("opportunities")
+    .update({ deadline, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("user_id", userId)
     .select()
@@ -156,6 +173,22 @@ export async function markActionComplete(actionId: string): Promise<Action> {
   return data as Action;
 }
 
+export async function updateActionDueAt(
+  id: string,
+  due_at: string | null
+): Promise<Action> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("actions")
+    .update({ due_at })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Action;
+}
+
 export async function createDraft(
   data: Omit<Draft, "id" | "created_at" | "user_id">
 ): Promise<Draft> {
@@ -241,6 +274,27 @@ export async function getImportedGmailMessageIds(): Promise<Set<string>> {
   );
 }
 
+export async function getImportedGoogleCalendarEventIds(): Promise<Set<string>> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("external_message_id")
+    .eq("user_id", userId)
+    .eq("source", "calendar")
+    .not("external_message_id", "is", null);
+
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .map((row) => {
+        const id = row.external_message_id as string | null;
+        return id?.startsWith("gcal:") ? id.slice(5) : null;
+      })
+      .filter((id): id is string => Boolean(id))
+  );
+}
+
 export async function getMessageByExternalId(
   externalMessageId: string
 ): Promise<Message | null> {
@@ -254,4 +308,161 @@ export async function getMessageByExternalId(
 
   if (error) throw error;
   return (data as Message | null) ?? null;
+}
+
+export async function getCalendarEventLinks(): Promise<CalendarEventLink[]> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("calendar_event_links")
+    .select("*")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as CalendarEventLink[];
+}
+
+export async function upsertCalendarEventLink(input: {
+  source_kind: CalendarEventLink["source_kind"];
+  source_id: string;
+  google_event_id: string;
+  google_calendar_id?: string;
+}): Promise<CalendarEventLink> {
+  const { supabase, userId } = await authContext();
+  const row = {
+    user_id: userId,
+    source_kind: input.source_kind,
+    source_id: input.source_id,
+    google_event_id: input.google_event_id,
+    google_calendar_id: input.google_calendar_id ?? "primary",
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("calendar_event_links")
+    .upsert(row, { onConflict: "user_id,source_kind,source_id" })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as CalendarEventLink;
+}
+
+export async function deleteCalendarEventLink(id: string): Promise<void> {
+  const { supabase, userId } = await authContext();
+  const { error } = await supabase
+    .from("calendar_event_links")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+}
+
+export async function getUserCalendarEvents(
+  rangeStart?: string,
+  rangeEnd?: string
+): Promise<UserCalendarEvent[]> {
+  const { supabase, userId } = await authContext();
+  let query = supabase
+    .from("user_calendar_events")
+    .select("*")
+    .eq("user_id", userId)
+    .order("starts_at", { ascending: true });
+
+  if (rangeStart) {
+    query = query.gte("starts_at", rangeStart);
+  }
+  if (rangeEnd) {
+    query = query.lte("starts_at", rangeEnd);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as UserCalendarEvent[];
+}
+
+export async function getUserCalendarEventById(
+  id: string
+): Promise<UserCalendarEvent | null> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("user_calendar_events")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as UserCalendarEvent | null) ?? null;
+}
+
+export async function createUserCalendarEvent(input: {
+  title: string;
+  description?: string | null;
+  starts_at: string;
+  ends_at: string;
+  all_day?: boolean;
+  opportunity_id?: string | null;
+  google_event_id?: string | null;
+  google_calendar_id?: string | null;
+}): Promise<UserCalendarEvent> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("user_calendar_events")
+    .insert({
+      user_id: userId,
+      title: input.title,
+      description: input.description ?? null,
+      starts_at: input.starts_at,
+      ends_at: input.ends_at,
+      all_day: input.all_day ?? true,
+      opportunity_id: input.opportunity_id ?? null,
+      google_event_id: input.google_event_id ?? null,
+      google_calendar_id: input.google_calendar_id ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as UserCalendarEvent;
+}
+
+export async function deleteUserCalendarEvent(
+  id: string
+): Promise<UserCalendarEvent | null> {
+  const existing = await getUserCalendarEventById(id);
+  if (!existing) return null;
+
+  const { supabase, userId } = await authContext();
+  const { error } = await supabase
+    .from("user_calendar_events")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  return existing;
+}
+
+export async function updateUserCalendarEventGoogleIds(
+  id: string,
+  googleEventId: string,
+  googleCalendarId = "primary"
+): Promise<UserCalendarEvent> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("user_calendar_events")
+    .update({
+      google_event_id: googleEventId,
+      google_calendar_id: googleCalendarId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as UserCalendarEvent;
 }
