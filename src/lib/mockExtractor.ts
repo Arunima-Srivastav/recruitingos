@@ -9,7 +9,7 @@ const KNOWN_ROLES = [
 ];
 
 const COMPANY_PATTERNS = [
-  /(?:at|from|join)\s+([A-Z][A-Za-z0-9&.\- ]{1,40}?)(?:\s+team|\s+for|\.|,|\n|$)/i,
+  /(?:at|from|join)\s+([A-Z][A-Za-z0-9&.\- ]{1,40}?)(?:\s+team|\s+for|\.|,|\n|:|$)/i,
   /([A-Z][A-Za-z0-9&.\- ]{1,40}?)\s+team/i,
   /(?:I['']m|I am)\s+a\s+recruiter\s+at\s+([A-Z][A-Za-z0-9&.\- ]{1,40})/i,
 ];
@@ -51,6 +51,7 @@ function extractRecruiterName(text: string): string | null {
     /(?:Hi|Hello|Hey),?\s+I'm\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/,
     /(?:Hi|Hello),?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+here/,
     /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+from\s+[A-Z]/,
+    /(?:I'm|I am)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),\s+a\s+recruiter/i,
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -81,12 +82,24 @@ function containsAny(text: string, keywords: string[]): boolean {
   return keywords.some((k) => lower.includes(k.toLowerCase()));
 }
 
-function isSchedulingFocused(text: string): boolean {
-  const scheduling = ["available", "schedule", "chat", "call", "meet", "calendar"];
-  const interview = ["interview", "final round", "technical interview"];
-  const schedCount = scheduling.filter((k) => text.toLowerCase().includes(k)).length;
-  const intCount = interview.filter((k) => text.toLowerCase().includes(k)).length;
-  return schedCount >= intCount && schedCount > 0;
+function hasInterviewSchedulingAsk(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    containsAny(lower, [
+      "interview",
+      "final round",
+      "technical interview",
+      "phone screen",
+      "onsite",
+    ]) &&
+    containsAny(lower, [
+      "available",
+      "schedule",
+      "availability",
+      "book a time",
+      "calendar",
+    ])
+  );
 }
 
 function classifyStageAndAction(text: string): {
@@ -112,11 +125,13 @@ function classifyStageAndAction(text: string): {
   }
 
   if (containsAny(lower, ["offer", "congratulations"])) {
-    return {
-      stage: "Offer",
-      action_type: "none",
-      next_action: "Review offer details and respond",
-    };
+    if (!hasInterviewSchedulingAsk(text)) {
+      return {
+        stage: "Offer",
+        action_type: "none",
+        next_action: "Review offer details and respond",
+      };
+    }
   }
 
   if (
@@ -145,7 +160,7 @@ function classifyStageAndAction(text: string): {
       "onsite",
     ])
   ) {
-    if (isSchedulingFocused(text)) {
+    if (hasInterviewSchedulingAsk(text)) {
       return {
         stage: "Interview Scheduling",
         action_type: "schedule",

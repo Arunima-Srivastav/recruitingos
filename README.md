@@ -87,18 +87,221 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000), sign in, then use Pipeline, Intake, Gmail, Discover, Today, and Calendar.
 
-### 5. Tests and build (optional)
+### 5. Testing and evaluation
+
+Recruiting OS has **automated unit tests**, an **extraction accuracy harness** with labeled fixtures, and a **manual smoke-test checklist** for full-stack verification. Nothing in the automated suite requires a live Supabase, Ollama, or Google account.
+
+#### Commands
+
+| Command | What it runs | External services |
+|---------|--------------|-------------------|
+| `npm test` | All unit tests + extraction regression (62 tests) | None |
+| `npm run eval:extract` | Heuristic parser accuracy report on labeled fixtures | None |
+| `npm run eval:extract:ollama` | Same report using live Ollama (`ministral-3:3b`) | `OLLAMA_API_KEY` |
+| `npm run lint` | ESLint | None |
+| `npm run build` | Production Next.js build (TypeScript check) | None |
+| `npm start` | Serve production build locally | Supabase if pages hit DB |
+
+**Pre-release checklist** (run from project root):
 
 ```bash
 npm test
+npm run eval:extract
+npm run lint
+npm run build
 ```
 
-Unit tests cover dedup matching, merge rules, apply URL normalization, priority (1-10), needs-reply detection, and calendar title guessing. No live Supabase or Ollama required.
+Then start the app (`npm run dev`), sign in, and walk through the [manual smoke test](#manual-smoke-test) below.
+
+#### Unit test coverage
+
+`npm test` runs **62 tests** across **30 suites** (`src/lib/**/*.test.ts`). All tests are offline — no network, database, or API keys.
+
+| Module | File(s) | What is tested |
+|--------|---------|----------------|
+| **Dedup — match** | `dedup/match.test.ts` | Company/role/URL duplicate detection, import linking |
+| **Dedup — merge** | `dedup/merge.test.ts` | Stage/deadline/source merge rules when combining cards |
+| **Dedup — normalize** | `dedup/normalize.test.ts` | Company/role normalization and fuzzy matching |
+| **Dedup — URLs** | `dedup/urls.test.ts` | Apply URL extraction, normalization, overlap |
+| **Priority** | `prioritizer.test.ts` | 1–10 scoring, inactive stage cap, legacy score migration |
+| **Needs reply** | `replies/detect.test.ts` | Reply detection for Today / home |
+| **Calendar** | `calendar/pipeline.test.ts` | Stage/company guessing from Google event titles |
+| **Drafts** | `ai/draft.test.ts` | Draft body sanitization (strip code fences) |
+| **Draft context** | `draftContext.test.ts` | Resume/highlight trimming for prompts |
+| **Resume parsing** | `resume/parseResumeFile.test.ts` | PDF/text upload parsing, extension checks |
+| **Extraction eval** | `evaluation/extraction.eval.test.ts` | Heuristic meets ≥75% accuracy on fixtures |
+| **Extraction scoring** | `evaluation/score.test.ts` | Fixture scorer: fuzzy match, unlabeled fields |
+
+#### Extraction evaluation
+
+Message extraction is the core AI/heuristic feature: turn raw recruiting email or LinkedIn text into structured pipeline data (company, role, stage, next action, etc.). The evaluation harness measures how often extraction output matches **human-labeled ground truth**.
+
+**Code location:** [`src/lib/evaluation/`](src/lib/evaluation/)
+
+| File | Purpose |
+|------|---------|
+| [`fixtures/recruiting-messages.json`](src/lib/evaluation/fixtures/recruiting-messages.json) | Labeled message corpus (8 fixtures) |
+| [`score.ts`](src/lib/evaluation/score.ts) | Field-by-field scoring and report formatting |
+| [`extraction.eval.test.ts`](src/lib/evaluation/extraction.eval.test.ts) | CI regression gate (≥75% heuristic accuracy) |
+| [`scripts/eval-extract.ts`](scripts/eval-extract.ts) | CLI report (`npm run eval:extract`) |
+
+##### What the fixtures are
+
+Each fixture is a realistic recruiting message with:
+
+- **`id`** — stable identifier
+- **`description`** — what scenario it represents
+- **`sourceType`** — optional channel hint (`gmail`, `linkedin`) passed to the extractor
+- **`rawText`** — the full message body (same format a student would paste or import)
+- **`expected`** — ground-truth labels for fields we care about
+
+Fixtures are derived from common student recruiting scenarios: recruiter outreach, OA deadlines, post-interview waiting, rejections, final-round scheduling, cold LinkedIn interest checks, offer letters, and third-party assessment platforms (HackerRank, CodeSignal). Five fixtures overlap with the demo seed messages in [`src/app/api/seed/route.ts`](src/app/api/seed/route.ts); three were added for edge cases (Needs Reply, Offer, CodeSignal).
+
+**Not every field is labeled on every fixture** — only include fields where the correct answer is unambiguous. Unlabeled fields are skipped during scoring.
+
+##### Fixture catalog
+
+| ID | Source | Scenario | Pipeline stage | Labeled fields |
+|----|--------|----------|----------------|----------------|
+| `databricks-recruiter` | LinkedIn | Recruiter asks to schedule a call | Recruiter Chat | company, role, stage, action, email, name, time-sensitive |
+| `stripe-oa` | Gmail | HackerRank OA with deadline | OA Pending | company, role, stage, action, email, deadline, time-sensitive |
+| `google-waiting` | Gmail | Post-interview “still deciding” | Interviewing | company, role, stage, action, time-sensitive |
+| `meta-rejected` | Gmail | Rejection after interviews | Rejected | role, stage, action, time-sensitive |
+| `anthropic-final` | Gmail | “Congratulations” + schedule final round | Interview Scheduling | company, role, stage, action, email, time-sensitive |
+| `needs-reply-interest` | LinkedIn | “Would you be interested?” outreach | Needs Reply | company, role, stage, action, email, time-sensitive |
+| `offer-congrats` | Gmail | Offer letter with decision deadline | Offer | company, role, stage, action, email, deadline, time-sensitive |
+| `codesignal-oa` | Gmail | CodeSignal assessment with deadline | OA Pending | company, stage, action, deadline, time-sensitive |
+
+##### How scoring works
+
+For each fixture, the harness runs the extractor and compares output to `expected`:
+
+| Field | Match rule |
+|-------|------------|
+| `company`, `role_title`, `recruiter_email`, `recruiter_name` | Case-insensitive fuzzy substring match (handles `"Stripe"` vs `"stripe"`, `"Software Engineer"` vs `"Software Engineering Intern"`) |
+| `stage`, `action_type` | Exact match |
+| `has_deadline` | Boolean — was any deadline extracted? (exact date not compared) |
+| `is_time_sensitive` | Exact boolean match |
+
+**Metrics reported:**
+
+- **Field accuracy** — `passed fields / total labeled fields` across all fixtures
+- **Fixture pass rate** — fixtures where every labeled field matched
+- **Regression threshold** — `npm test` fails if heuristic field accuracy drops below **75%** (`HEURISTIC_MIN_ACCURACY` in [`src/lib/evaluation/index.ts`](src/lib/evaluation/index.ts))
+
+##### Results (heuristic parser)
+
+Last run: **`npm run eval:extract`** — heuristic fallback parser ([`src/lib/mockExtractor.ts`](src/lib/mockExtractor.ts)), no Ollama.
+
+**Overall**
+
+| Metric | Result |
+|--------|--------|
+| Field accuracy | **100.0%** (47 / 47 labeled fields) |
+| Fixture pass rate | **100%** (8 / 8 fixtures fully correct) |
+| Regression threshold | 75% minimum — **pass** |
+
+**Per-fixture results**
+
+| Fixture | Fields scored | Pass |
+|---------|---------------|------|
+| `databricks-recruiter` | 7 / 7 | ✓ |
+| `stripe-oa` | 7 / 7 | ✓ |
+| `google-waiting` | 5 / 5 | ✓ |
+| `meta-rejected` | 4 / 4 | ✓ |
+| `anthropic-final` | 6 / 6 | ✓ |
+| `needs-reply-interest` | 6 / 6 | ✓ |
+| `offer-congrats` | 7 / 7 | ✓ |
+| `codesignal-oa` | 5 / 5 | ✓ |
+
+**Per-field accuracy** (across all fixtures where the field is labeled)
+
+| Field | Times labeled | Heuristic accuracy |
+|-------|---------------|-------------------|
+| `stage` | 8 | 100% |
+| `action_type` | 8 | 100% |
+| `is_time_sensitive` | 8 | 100% |
+| `company` | 7 | 100% |
+| `role_title` | 7 | 100% |
+| `recruiter_email` | 5 | 100% |
+| `has_deadline` | 3 | 100% |
+| `recruiter_name` | 1 | 100% |
+
+```mermaid
+xychart-beta
+    title "Heuristic extraction accuracy by field (%)"
+    x-axis ["stage", "action", "time_sens", "company", "role", "email", "deadline", "name"]
+    y-axis "Accuracy" 0 --> 100
+    bar [100, 100, 100, 100, 100, 100, 100, 100]
+```
+
+```mermaid
+pie title Labeled fields by pipeline stage (47 total)
+    "OA Pending" : 12
+    "Recruiter Chat / Needs Reply" : 13
+    "Interviewing / Scheduling" : 11
+    "Rejected / Offer" : 11
+```
+
+##### Ollama (live AI) evaluation
+
+When `OLLAMA_API_KEY` is set, run:
+
+```bash
+npm run eval:extract:ollama
+```
+
+This uses the same fixtures and scoring but calls [`extractRecruitingMessage`](src/lib/ai/extract.ts) with Mistral (`ministral-3:3b` by default). Results vary by model and API availability — re-run after changing `OLLAMA_MODEL` or prompts. The CLI uses a **50%** minimum threshold for Ollama (vs **75%** for heuristic in CI).
+
+##### Adding a fixture
+
+1. Add an entry to [`src/lib/evaluation/fixtures/recruiting-messages.json`](src/lib/evaluation/fixtures/recruiting-messages.json).
+2. Include only unambiguous `expected` fields.
+3. Run `npm run eval:extract` and confirm accuracy.
+4. `npm test` picks up the new fixture automatically.
+
+Example:
+
+```json
+{
+  "id": "my-fixture",
+  "description": "Short scenario description",
+  "sourceType": "gmail",
+  "rawText": "Full message text…",
+  "expected": {
+    "company": "Acme",
+    "stage": "OA Pending",
+    "action_type": "oa",
+    "has_deadline": true
+  }
+}
+```
+
+#### Manual smoke test
+
+Use this after `npm run dev` with Supabase configured. Optional columns need the listed env vars.
+
+| Step | Page / action | Verify | Requires |
+|------|---------------|--------|----------|
+| 1 | `/login` | Sign up or sign in | Supabase |
+| 2 | `POST /api/seed` (while signed in) | Demo pipeline populates | Supabase |
+| 3 | `/intake` | Paste message → extract → save → card on Pipeline | Supabase; Ollama optional |
+| 4 | `/pipeline` | Drag card between columns; change stage dropdown | Supabase |
+| 5 | `/today` | Actions and “Needs your reply” appear with priority | Supabase |
+| 6 | `/discover` | Browse a board → import → card appears | Supabase + network |
+| 7 | `/opportunities/[id]` | View messages, complete action, generate draft | Supabase; Ollama optional for AI draft |
+| 8 | Account / draft context | Upload or paste resume + highlights | Supabase + migration `006` |
+| 9 | `/gmail` | Connect → scan → import selected | Google OAuth + Supabase |
+| 10 | `/calendar` | View events, sync to Google, export `.ics` | Google OAuth + Calendar API |
+
+**Production build smoke test:**
 
 ```bash
 npm run build
 npm start
 ```
+
+Open [http://localhost:3000](http://localhost:3000) and repeat sign-in + one intake save to confirm the build serves correctly.
 
 ## Core user flow
 
@@ -182,9 +385,12 @@ src/
     dedup/             # Match, merge, import linking
     discover/          # Job board adapters
     calendar/          # Events, Google sync
+    evaluation/        # Extraction fixtures + accuracy harness
     replies/           # Needs-reply detection
     prioritizer.ts     # 1-10 priority scoring
     db.ts              # Supabase access (requireUser + RLS)
+scripts/
+  eval-extract.ts      # CLI extraction accuracy report
 supabase/
   schema.sql
   migrations/
@@ -232,7 +438,7 @@ Run [`supabase/migrations/006_user_draft_context.sql`](supabase/migrations/006_u
 
 ## Roadmap
 
-- **evaluation**: labeled fixtures + extraction accuracy harness
+- ~~**evaluation**: labeled fixtures + extraction accuracy harness~~ (see `src/lib/evaluation/`)
 - **deploy-polish**: DigitalOcean App Platform, production OAuth redirects
 
 ## Troubleshooting
@@ -247,3 +453,5 @@ Run [`supabase/migrations/006_user_draft_context.sql`](supabase/migrations/006_u
 | Gmail connect fails | Redirect URI must match Google Console exactly |
 | Priority looks wrong on old data | Re-import or edit stage; new saves use 1-10 |
 | Build fails | `npm install`, Node 20+, `npm run build` |
+| Extraction eval fails in CI | Run `npm run eval:extract` for per-field failures; check [`src/lib/mockExtractor.ts`](src/lib/mockExtractor.ts) |
+| `eval:extract:ollama` exits 1 | Set `OLLAMA_API_KEY`; Ollama threshold is 50% — inspect printed mismatches |

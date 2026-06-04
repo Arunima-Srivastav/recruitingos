@@ -1,0 +1,113 @@
+[
+  {
+    "id": "databricks-recruiter",
+    "description": "LinkedIn recruiter outreach with scheduling ask",
+    "sourceType": "linkedin",
+    "rawText": "Hi Arunima,\n\nI'm Sarah, a recruiter at Databricks. We have an opening for our Software Engineering Intern role and your background looks like a great fit.\n\nWould you be available for a quick call next week to chat about the opportunity?\n\nBest,\nSarah Chen\nsarah.chen@databricks.com",
+    "expected": {
+      "company": "Databricks",
+      "role_title": "Software Engineer",
+      "stage": "Recruiter Chat",
+      "action_type": "schedule",
+      "recruiter_email": "sarah.chen@databricks.com",
+      "recruiter_name": "Sarah",
+      "is_time_sensitive": false
+    }
+  },
+  {
+    "id": "stripe-oa",
+    "description": "Gmail OA deadline with HackerRank link",
+    "sourceType": "gmail",
+    "rawText": "Subject: Stripe - Online Assessment\n\nHi Arunima,\n\nThank you for your interest in the New Grad Software Engineer role at Stripe.\n\nPlease complete our online assessment on HackerRank by March 28, 2026. The coding challenge should take about 90 minutes.\n\nLink: https://hackerrank.com/stripe-oa\n\nBest,\nStripe Recruiting\nrecruiting@stripe.com",
+    "expected": {
+      "company": "Stripe",
+      "role_title": "Software Engineer",
+      "stage": "OA Pending",
+      "action_type": "oa",
+      "recruiter_email": "recruiting@stripe.com",
+      "has_deadline": true,
+      "is_time_sensitive": true
+    }
+  },
+  {
+    "id": "google-waiting",
+    "description": "Post-interview waiting message with no action",
+    "sourceType": "gmail",
+    "rawText": "Hi Arunima,\n\nThank you for interviewing with the Google team for the Software Engineer role. We enjoyed our conversation.\n\nWe're still finalizing next steps and will follow up soon. No action needed on your end right now.\n\nBest,\nGoogle Recruiting",
+    "expected": {
+      "company": "Google",
+      "role_title": "Software Engineer",
+      "stage": "Interviewing",
+      "action_type": "none",
+      "is_time_sensitive": false
+    }
+  },
+  {
+    "id": "meta-rejected",
+    "description": "Rejection after interviews",
+    "sourceType": "gmail",
+    "rawText": "Hi Arunima,\n\nThank you for your interest in Meta and for taking the time to interview with us.\n\nUnfortunately, we have decided to move forward with other candidates for the Software Engineer New Grad position. We appreciate your time and wish you the best.\n\nBest,\nMeta Recruiting Team",
+    "expected": {
+      "role_title": "Software Engineer",
+      "stage": "Rejected",
+      "action_type": "none",
+      "is_time_sensitive": false
+    }
+  },
+  {
+    "id": "anthropic-final",
+    "description": "Final round interview scheduling request",
+    "sourceType": "gmail",
+    "rawText": "Hi Arunima,\n\nCongratulations! We'd like to invite you to the final round interview for the Machine Learning Engineer role at Anthropic.\n\nAre you available to schedule a technical interview next week? Please reply with your availability.\n\nBest,\nAnthropic Recruiting\ntalent@anthropic.com",
+    "expected": {
+      "company": "Anthropic",
+      "role_title": "Machine Learning Engineer",
+      "stage": "Interview Scheduling",
+      "action_type": "schedule",
+      "recruiter_email": "talent@anthropic.com",
+      "is_time_sensitive": true
+    }
+  },
+  {
+    "id": "needs-reply-interest",
+    "description": "Cold outreach asking if candidate is interested",
+    "sourceType": "linkedin",
+    "rawText": "Hi Arunima,\n\nI came across your profile and wanted to reach out about a Product Manager role at Notion.\n\nWould you be interested in learning more?\n\nThanks,\nJamie\njamie@notion.so",
+    "expected": {
+      "company": "Notion",
+      "role_title": "Product Manager",
+      "stage": "Needs Reply",
+      "action_type": "reply",
+      "recruiter_email": "jamie@notion.so",
+      "is_time_sensitive": true
+    }
+  },
+  {
+    "id": "offer-congrats",
+    "description": "Offer notification",
+    "sourceType": "gmail",
+    "rawText": "Hi Arunima,\n\nCongratulations on your offer for the Software Engineer internship at Figma!\n\nPlease review the attached offer letter and let us know your decision by April 15, 2026.\n\nBest,\nFigma People Team\noffers@figma.com",
+    "expected": {
+      "company": "Figma",
+      "role_title": "Software Engineer",
+      "stage": "Offer",
+      "action_type": "none",
+      "recruiter_email": "offers@figma.com",
+      "has_deadline": true,
+      "is_time_sensitive": false
+    }
+  },
+  {
+    "id": "codesignal-oa",
+    "description": "CodeSignal OA with explicit deadline",
+    "sourceType": "gmail",
+    "rawText": "Hi,\n\nNext step for the Backend Engineer role at Plaid: complete the CodeSignal assessment.\n\nDeadline: April 2, 2026\n\nLink: https://codesignal.com/plaid\n\nPlaid Recruiting",
+    "expected": {
+      "company": "Plaid",
+      "stage": "OA Pending",
+      "action_type": "oa",
+      "has_deadline": true,
+      "is_time_sensitive": true
+    }
+  }
+]

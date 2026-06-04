@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/**/*.test.ts"
+    "test": "tsx --test src/lib/**/*.test.ts",
+    "eval:extract": "tsx scripts/eval-extract.ts",
+    "eval:extract:ollama": "tsx scripts/eval-extract.ts --ollama"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
