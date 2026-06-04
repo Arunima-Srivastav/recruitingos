@@ -5,6 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import DraftCard from "@/components/DraftCard";
+import AddToCalendarLinks, {
+  buildOpportunityExportHref,
+} from "@/components/AddToCalendarLinks";
+import { buildCalendarEvents } from "@/lib/calendar/events";
+import { buildGoogleCalendarUrl, buildCalendarExportUrl } from "@/lib/calendar/google";
 import { getSupabaseConfigError } from "@/lib/config";
 import { STAGES, TONES } from "@/lib/constants";
 import type { Tone } from "@/lib/constants";
@@ -180,6 +185,10 @@ export default function OpportunityDetailPage() {
   const stageColor =
     STAGE_COLORS[opportunity.stage] ?? "bg-slate-100 text-slate-700";
 
+  const pendingActions = actions.filter((action) => action.status === "pending");
+  const calendarEvents = buildCalendarEvents([opportunity], pendingActions);
+  const deadlineEvent = calendarEvents.find((event) => event.kind === "deadline");
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <Link
@@ -224,7 +233,7 @@ export default function OpportunityDetailPage() {
           </p>
           <p>
             <span className="font-medium text-slate-500">Next action:</span>{" "}
-            {opportunity.next_action ?? "—"}
+            {opportunity.next_action ?? "-"}
           </p>
         </div>
 
@@ -256,7 +265,23 @@ export default function OpportunityDetailPage() {
         </div>
       </div>
 
-      <section className="mt-8">
+      {deadlineEvent && (
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Add to calendar</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Export this deadline to your calendar app.
+          </p>
+          <div className="mt-3">
+            <AddToCalendarLinks
+              exportHref={buildOpportunityExportHref(opportunity.id)}
+              googleHref={buildGoogleCalendarUrl(deadlineEvent)}
+              compact
+            />
+          </div>
+        </section>
+      )}
+
+      <section id="drafts" className="mt-8">
         <h2 className="mb-1 text-lg font-semibold text-slate-900">
           Generate draft
         </h2>
@@ -302,7 +327,12 @@ export default function OpportunityDetailPage() {
           <p className="text-sm text-slate-500">No actions yet.</p>
         ) : (
           <div className="space-y-2">
-            {actions.map((action) => (
+            {actions.map((action) => {
+              const actionEvent = action.due_at
+                ? buildCalendarEvents([], [{ ...action, opportunity }])[0]
+                : null;
+
+              return (
               <div
                 key={action.id}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
@@ -311,7 +341,17 @@ export default function OpportunityDetailPage() {
                   <p className="font-medium text-slate-800">{action.title}</p>
                   <p className="text-xs text-slate-500 capitalize">
                     {action.status} · {action.action_type}
+                    {action.due_at ? ` · Due ${formatDate(action.due_at)}` : ""}
                   </p>
+                  {actionEvent && action.status === "pending" && (
+                    <div className="mt-2">
+                      <AddToCalendarLinks
+                        exportHref={buildCalendarExportUrl({ actionId: action.id })}
+                        googleHref={buildGoogleCalendarUrl(actionEvent)}
+                        compact
+                      />
+                    </div>
+                  )}
                 </div>
                 {action.status === "pending" && (
                   <button
@@ -323,7 +363,8 @@ export default function OpportunityDetailPage() {
                   </button>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </section>

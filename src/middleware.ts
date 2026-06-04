@@ -7,6 +7,7 @@ const PROTECTED_PREFIXES = [
   "/today",
   "/gmail",
   "/account",
+  "/calendar",
   "/opportunities",
 ];
 

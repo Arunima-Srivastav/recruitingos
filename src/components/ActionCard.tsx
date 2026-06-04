@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import AddToCalendarLinks from "@/components/AddToCalendarLinks";
 import type { ActionWithOpportunity } from "@/lib/types";
+import { buildCalendarEvents } from "@/lib/calendar/events";
+import { buildCalendarExportUrl, buildGoogleCalendarUrl } from "@/lib/calendar/google";
 import { getPrimaryReason } from "@/lib/prioritizer";
 import { calculatePriority } from "@/lib/prioritizer";
 import { formatDate } from "@/lib/utils";
@@ -26,6 +29,11 @@ export default function ActionCard({
     created_at: action.created_at,
   });
 
+  const calendarEvent =
+    action.due_at && action.status === "pending"
+      ? buildCalendarEvents([], [action])[0]
+      : null;
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -44,7 +52,7 @@ export default function ActionCard({
           )}
           {opp && (
             <p className="mt-2 text-sm text-slate-700">
-              {opp.company ?? "Unknown"} — {opp.role_title ?? "Role TBD"}
+              {opp.company ?? "Unknown"} · {opp.role_title ?? "Role TBD"}
             </p>
           )}
           <p className="mt-2 text-xs text-amber-700">
@@ -54,6 +62,15 @@ export default function ActionCard({
             <p className="mt-1 text-xs text-slate-500">
               Due: {formatDate(action.due_at)}
             </p>
+          )}
+          {calendarEvent && (
+            <div className="mt-2">
+              <AddToCalendarLinks
+                exportHref={buildCalendarExportUrl({ actionId: action.id })}
+                googleHref={buildGoogleCalendarUrl(calendarEvent)}
+                compact
+              />
+            </div>
           )}
         </div>
         <div className="flex flex-col gap-2">

@@ -1,0 +1,7 @@
+import CalendarView from "@/components/CalendarView";
+
+export const dynamic = "force-dynamic";
+
+export default function CalendarPage() {
+  return <CalendarView />;
+}

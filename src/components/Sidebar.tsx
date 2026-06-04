@@ -10,6 +10,7 @@ const links = [
   { href: "/gmail", label: "Gmail", icon: "📥" },
   { href: "/pipeline", label: "Pipeline", icon: "▦" },
   { href: "/today", label: "Today", icon: "◎" },
+  { href: "/calendar", label: "Calendar", icon: "📅" },
 ];
 
 export default function Sidebar() {

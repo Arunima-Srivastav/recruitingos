@@ -11,6 +11,7 @@ const links = [
   { href: "/gmail", label: "Gmail" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/today", label: "Today" },
+  { href: "/calendar", label: "Calendar" },
 ];
 
 export default function Navbar({ userEmail }: { userEmail: string | null }) {
