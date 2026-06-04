@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import DraftCard from "@/components/DraftCard";
+import DuplicateOpportunityBanner from "@/components/DuplicateOpportunityBanner";
 import AddToCalendarLinks, {
   buildOpportunityExportHref,
 } from "@/components/AddToCalendarLinks";
@@ -264,6 +265,11 @@ export default function OpportunityDetailPage() {
           </button>
         </div>
       </div>
+
+      <DuplicateOpportunityBanner
+        opportunityId={id}
+        onMerged={() => fetchAll()}
+      />
 
       {deadlineEvent && (
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
