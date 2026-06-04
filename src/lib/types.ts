@@ -87,3 +87,11 @@ export interface PriorityResult {
   score: number;
   reasons: string[];
 }
+
+export interface UserDraftContext {
+  user_id: string;
+  resume_text: string | null;
+  highlights_text: string | null;
+  resume_filename: string | null;
+  updated_at: string;
+}

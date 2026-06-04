@@ -8,6 +8,7 @@ import type {
   Draft,
   Message,
   Opportunity,
+  UserDraftContext,
 } from "./types";
 
 async function authContext() {
@@ -552,4 +553,40 @@ export async function updateUserCalendarEventGoogleIds(
 
   if (error) throw error;
   return data as UserCalendarEvent;
+}
+
+export async function getUserDraftContext(): Promise<UserDraftContext | null> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("user_draft_context")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as UserDraftContext | null) ?? null;
+}
+
+export async function upsertUserDraftContext(input: {
+  resume_text: string | null;
+  highlights_text: string | null;
+  resume_filename?: string | null;
+}): Promise<UserDraftContext> {
+  const { supabase, userId } = await authContext();
+  const row = {
+    user_id: userId,
+    resume_text: input.resume_text,
+    highlights_text: input.highlights_text,
+    resume_filename: input.resume_filename ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from("user_draft_context")
+    .upsert(row, { onConflict: "user_id" })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as UserDraftContext;
 }
