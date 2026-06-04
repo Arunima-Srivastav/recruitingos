@@ -6,7 +6,18 @@ interface PriorityInput {
   deadline?: string | null;
   due_at?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
+  source?: string | null;
 }
+
+const SOURCE_BOOST: Record<string, number> = {
+  gmail: 12,
+  manual: 6,
+  linkedin: 6,
+  job_post: 4,
+  discover: 0,
+  calendar: 2,
+};
 
 function hoursUntil(dateStr: string): number | null {
   const date = new Date(dateStr);
@@ -51,9 +62,19 @@ export function calculatePriority(input: PriorityInput): PriorityResult {
     reasons.push("Reply needed");
   }
 
+  if (input.stage === "Recruiter Chat") {
+    score += 22;
+    reasons.push("Active recruiter conversation");
+  }
+
   if (input.stage === "Interview Scheduling") {
     score += 30;
     reasons.push("Scheduling request");
+  }
+
+  if (input.stage === "Interviewing" || input.stage === "OA Pending") {
+    score += 18;
+    reasons.push("Active interview process");
   }
 
   if (input.action_type === "oa") {
@@ -64,6 +85,19 @@ export function calculatePriority(input: PriorityInput): PriorityResult {
   if (isWithinLastHours(input.created_at, 48)) {
     score += 10;
     reasons.push("Recently received");
+  }
+
+  if (isWithinLastHours(input.updated_at, 24)) {
+    score += 8;
+    reasons.push("Recently updated");
+  }
+
+  const sourceBoost = SOURCE_BOOST[input.source ?? ""] ?? 0;
+  if (sourceBoost > 0) {
+    score += sourceBoost;
+    if (input.source === "gmail") {
+      reasons.push("Gmail thread");
+    }
   }
 
   if (input.stage === "Waiting") {

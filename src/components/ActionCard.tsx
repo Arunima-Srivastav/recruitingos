@@ -27,6 +27,8 @@ export default function ActionCard({
     deadline: opp?.deadline,
     due_at: action.due_at,
     created_at: action.created_at,
+    updated_at: opp?.updated_at,
+    source: opp?.source,
   });
 
   const calendarEvent =

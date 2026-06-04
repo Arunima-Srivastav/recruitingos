@@ -89,6 +89,8 @@ export function detectNeedsReply(
       deadline: opp?.deadline,
       due_at: action.due_at,
       created_at: action.created_at,
+      updated_at: opp?.updated_at,
+      source: opp?.source,
     });
 
     items.push({
@@ -113,7 +115,9 @@ export function detectNeedsReply(
       stage: opportunity.stage,
       action_type: "reply",
       deadline: opportunity.deadline,
-      created_at: opportunity.updated_at,
+      created_at: opportunity.created_at,
+      updated_at: opportunity.updated_at,
+      source: opportunity.source,
     });
 
     items.push({

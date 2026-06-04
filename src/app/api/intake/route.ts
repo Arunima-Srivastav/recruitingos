@@ -2,6 +2,12 @@ import { handleApiError } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { normalizeReviewedExtraction } from "@/lib/ai/extract";
 import { mockExtract } from "@/lib/mockExtractor";
+import { buildOpportunityUrlMap, findDuplicatesForOpportunity } from "@/lib/dedup/match";
+import {
+  getAllMessagesForUser,
+  getOpportunities,
+  getOpportunityById,
+} from "@/lib/db";
 import { saveOpportunityFromMessage } from "@/lib/intake/saveMessage";
 import type { ExtractedRecruitingData } from "@/lib/types";
 
@@ -31,7 +37,25 @@ export async function POST(request: Request) {
       extracted: extractedData,
     });
 
-    return NextResponse.json(result);
+    const [opportunities, messages, created] = await Promise.all([
+      getOpportunities(),
+      getAllMessagesForUser(),
+      getOpportunityById(result.opportunity_id),
+    ]);
+
+    const possible_duplicates =
+      created != null
+        ? findDuplicatesForOpportunity(
+            created,
+            opportunities,
+            buildOpportunityUrlMap(messages)
+          )
+        : [];
+
+    return NextResponse.json({
+      ...result,
+      possible_duplicates,
+    });
   } catch (err) {
     return handleApiError(err, "Failed to process message");
   }
