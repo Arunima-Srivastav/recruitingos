@@ -43,7 +43,10 @@ export function calculatePriority(input: PriorityInput): PriorityResult {
     reasons.push("Deadline is within 3 days");
   }
 
-  if (input.stage === "Needs Reply") {
+  if (input.action_type === "reply") {
+    score += 30;
+    reasons.push("Reply needed");
+  } else if (input.stage === "Needs Reply") {
     score += 30;
     reasons.push("Reply needed");
   }

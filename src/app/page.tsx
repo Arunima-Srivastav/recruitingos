@@ -1,14 +1,17 @@
 import Link from "next/link";
 import ConfigErrorBanner from "@/components/ConfigErrorBanner";
-import StatCard from "@/components/StatCard";
 import LoadDemoButton from "@/components/LoadDemoButton";
+import NeedsReplyPanel from "@/components/NeedsReplyPanel";
+import StatCard from "@/components/StatCard";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSupabaseConfigError } from "@/lib/config";
 import {
   countOpportunities,
   countPendingActions,
   getOpportunities,
+  getPendingActions,
 } from "@/lib/db";
+import { detectNeedsReply } from "@/lib/replies/detect";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +20,21 @@ export default async function HomePage() {
   const user = await getCurrentUser();
   let opportunityCount = 0;
   let pendingActionCount = 0;
-  let needsReplyCount = 0;
+  let replyItems: ReturnType<typeof detectNeedsReply> = [];
   let dbError: string | null = configError;
 
   if (user && !configError) {
     try {
-      opportunityCount = await countOpportunities();
-      pendingActionCount = await countPendingActions();
-      const opps = await getOpportunities();
-      needsReplyCount = opps.filter((o) => o.stage === "Needs Reply").length;
+      const [opportunityCountResult, pendingActionCountResult, opps, actions] =
+        await Promise.all([
+          countOpportunities(),
+          countPendingActions(),
+          getOpportunities(),
+          getPendingActions(),
+        ]);
+      opportunityCount = opportunityCountResult;
+      pendingActionCount = pendingActionCountResult;
+      replyItems = detectNeedsReply(opps, actions);
     } catch (err) {
       dbError =
         err instanceof Error
@@ -68,11 +77,12 @@ export default async function HomePage() {
 
       {user && (
         <>
-          <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          <div className="mb-8 grid gap-4 sm:grid-cols-2">
             <StatCard label="Opportunities" value={opportunityCount} />
             <StatCard label="Pending actions" value={pendingActionCount} />
-            <StatCard label="Needs reply" value={needsReplyCount} />
           </div>
+
+          <NeedsReplyPanel items={replyItems} />
 
           <div className="mb-8 flex flex-wrap gap-3">
             <Link
@@ -104,7 +114,7 @@ export default async function HomePage() {
             href="/login"
             className="inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
-            Get started — Sign in
+            Get started · Sign in
           </Link>
         </div>
       )}
