@@ -181,7 +181,7 @@ function GmailImportContent() {
         <ul className="mt-2 list-inside list-disc space-y-1">
           <li>Only messages you select are imported and stored.</li>
           <li>Original message text is saved for review and auditability.</li>
-          <li>Read-only Gmail access — nothing is sent or deleted.</li>
+          <li>Read-only Gmail access. Nothing is sent or deleted.</li>
         </ul>
       </div>
 
@@ -368,7 +368,7 @@ function GmailImportContent() {
                     <p className="mt-2 text-sm text-slate-500">{msg.snippet}</p>
                     {(msg.previewCompany || msg.previewStage) && (
                       <p className="mt-2 text-xs text-indigo-700">
-                        Preview: {msg.previewCompany ?? "Unknown company"} —{" "}
+                        Preview: {msg.previewCompany ?? "Unknown company"} ·{" "}
                         {msg.previewStage ?? "Unknown stage"} (heuristic preview;
                         Ollama runs on import)
                       </p>

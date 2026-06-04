@@ -33,7 +33,7 @@ function LoginForm() {
         });
         if (signUpError) throw signUpError;
         setMessage(
-          "Account created. If email confirmation is enabled in Supabase, check your inbox — then sign in."
+          "Account created. If email confirmation is enabled in Supabase, check your inbox, then sign in."
         );
         setMode("signin");
       } else {

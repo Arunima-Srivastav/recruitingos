@@ -24,7 +24,7 @@ sarah.chen@databricks.com`,
   },
   {
     source: "gmail",
-    text: `Subject: Stripe — Online Assessment
+    text: `Subject: Stripe - Online Assessment
 
 Hi Arunima,
 
