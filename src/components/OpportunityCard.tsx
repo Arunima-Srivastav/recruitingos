@@ -5,13 +5,21 @@ import type { Opportunity } from "@/lib/types";
 import { STAGE_COLORS, STAGES } from "@/lib/constants";
 import { formatDate, formatRelative, cn } from "@/lib/utils";
 
+const OPPORTUNITY_DRAG_TYPE = "application/x-opportunity-id";
+
 interface Props {
   opportunity: Opportunity;
   onStageChange?: (stage: string) => void;
   onDelete?: () => void;
   deleting?: boolean;
   showStageSelect?: boolean;
+  draggable?: boolean;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
+
+export { OPPORTUNITY_DRAG_TYPE };
 
 export default function OpportunityCard({
   opportunity,
@@ -19,13 +27,37 @@ export default function OpportunityCard({
   onDelete,
   deleting,
   showStageSelect = false,
+  draggable = false,
+  isDragging = false,
+  onDragStart,
+  onDragEnd,
 }: Props) {
   const stageColor =
     STAGE_COLORS[opportunity.stage] ?? "bg-slate-100 text-slate-700";
 
+  function handleDragStart(e: React.DragEvent<HTMLDivElement>) {
+    e.dataTransfer.setData(OPPORTUNITY_DRAG_TYPE, opportunity.id);
+    e.dataTransfer.setData("text/plain", opportunity.id);
+    e.dataTransfer.effectAllowed = "move";
+    onDragStart?.();
+  }
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
-      <Link href={`/opportunities/${opportunity.id}`} className="block">
+    <div
+      draggable={draggable}
+      onDragStart={draggable ? handleDragStart : undefined}
+      onDragEnd={draggable ? onDragEnd : undefined}
+      className={cn(
+        "rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md",
+        draggable && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50 ring-2 ring-indigo-300"
+      )}
+    >
+      <Link
+        href={`/opportunities/${opportunity.id}`}
+        className="block"
+        draggable={false}
+      >
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="font-semibold text-slate-900">

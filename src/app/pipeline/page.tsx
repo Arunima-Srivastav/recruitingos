@@ -15,6 +15,7 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const fetchOpportunities = useCallback(async () => {
     setLoading(true);
@@ -51,16 +52,36 @@ export default function PipelinePage() {
   }, [fetchOpportunities]);
 
   async function handleStageChange(id: string, stage: string) {
+    const previous = opportunities.find((o) => o.id === id);
+    if (!previous || previous.stage === stage) return;
+
+    setOpportunities((prev) =>
+      prev.map((o) =>
+        o.id === id ? { ...o, stage, updated_at: new Date().toISOString() } : o
+      )
+    );
+
     const res = await fetch("/api/opportunities/update-stage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ opportunity_id: id, stage }),
     });
+
     if (res.ok) {
+      const data = await res.json();
       setOpportunities((prev) =>
-        prev.map((o) => (o.id === id ? { ...o, stage } : o))
+        prev.map((o) => (o.id === id ? (data.opportunity as Opportunity) : o))
       );
+      return;
     }
+
+    setOpportunities((prev) =>
+      prev.map((o) => (o.id === id ? previous : o))
+    );
+    const data = await res.json().catch(() => ({}));
+    setError(
+      (data as { error?: string }).error ?? "Failed to update stage. Try again."
+    );
   }
 
   async function handleDelete(id: string) {
@@ -106,7 +127,8 @@ export default function PipelinePage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Pipeline</h1>
           <p className="text-slate-600">
-            All recruiting opportunities grouped by stage.
+            Drag cards between columns to change stage, or use the dropdown on
+            each card.
           </p>
         </div>
         <Link
@@ -158,6 +180,9 @@ export default function PipelinePage() {
               onStageChange={handleStageChange}
               onDelete={handleDelete}
               deletingId={deletingId}
+              draggingId={draggingId}
+              onDragStart={setDraggingId}
+              onDragEnd={() => setDraggingId(null)}
             />
           ))}
         </div>
