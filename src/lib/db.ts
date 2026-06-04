@@ -310,6 +310,25 @@ export async function getMessageByExternalId(
   return (data as Message | null) ?? null;
 }
 
+export async function getImportedExternalIdsWithPrefix(
+  prefix: string
+): Promise<Set<string>> {
+  const { supabase, userId } = await authContext();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("external_message_id")
+    .eq("user_id", userId)
+    .like("external_message_id", `${prefix}%`);
+
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .map((row) => row.external_message_id)
+      .filter((id): id is string => Boolean(id))
+  );
+}
+
 export async function getCalendarEventLinks(): Promise<CalendarEventLink[]> {
   const { supabase, userId } = await authContext();
   const { data, error } = await supabase
