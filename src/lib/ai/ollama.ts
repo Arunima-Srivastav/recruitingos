@@ -2,6 +2,7 @@ import {
   EXTRACTION_SYSTEM_PROMPT,
   buildExtractionUserPrompt,
 } from "./prompts";
+import { getOllamaExtractionModel } from "./model";
 
 export interface OllamaConfig {
   apiKey: string;
@@ -19,7 +20,7 @@ export function getOllamaConfig(): OllamaConfig | null {
       /\/$/,
       ""
     ),
-    model: process.env.OLLAMA_MODEL ?? "ministral-3:3b",
+    model: getOllamaExtractionModel(),
   };
 }
 

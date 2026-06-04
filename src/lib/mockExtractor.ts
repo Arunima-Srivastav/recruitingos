@@ -138,29 +138,43 @@ function classifyStageAndAction(text: string): {
 
   if (
     containsAny(lower, [
+      "interview",
+      "final round",
+      "technical interview",
+      "phone screen",
+      "onsite",
+    ])
+  ) {
+    if (isSchedulingFocused(text)) {
+      return {
+        stage: "Interview Scheduling",
+        action_type: "schedule",
+        next_action: "Reply with availability to schedule interview",
+      };
+    }
+    return {
+      stage: "Interviewing",
+      action_type: "none",
+      next_action: "Prepare for upcoming interview",
+    };
+  }
+
+  if (
+    containsAny(lower, [
       "available",
       "schedule",
       "chat",
       "call",
       "meet",
       "calendar",
+      "book a time",
+      "quick call",
     ])
   ) {
     return {
-      stage: "Interview Scheduling",
+      stage: "Recruiter Chat",
       action_type: "schedule",
-      next_action: "Reply with availability to schedule",
-    };
-  }
-
-  if (
-    containsAny(lower, ["interview", "final round", "technical interview"]) &&
-    !isSchedulingFocused(text)
-  ) {
-    return {
-      stage: "Interviewing",
-      action_type: "none",
-      next_action: "Prepare for upcoming interview",
+      next_action: "Book time with recruiter",
     };
   }
 
@@ -204,7 +218,7 @@ export function mockExtract(text: string): ExtractedRecruitingData {
 
   const short_summary = [
     company ? company : "Unknown company",
-    role_title ? `— ${role_title}` : "",
+    role_title ? `· ${role_title}` : "",
     `(${stage})`,
   ].join(" ");
 

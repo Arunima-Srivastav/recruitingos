@@ -1,5 +1,6 @@
 import { mockExtract } from "@/lib/mockExtractor";
 import type { ExtractedRecruitingData } from "@/lib/types";
+import { getOllamaExtractionModel } from "./model";
 import { extractWithOllama, isOllamaConfigured } from "./ollama";
 import {
   aiExtractionSchema,
@@ -28,7 +29,7 @@ const AI_STAGE_TO_PIPELINE: Record<AiExtraction["stage"], string> = {
   sourced: "New",
   saved: "New",
   applied: "Waiting",
-  recruiter_contact: "Needs Reply",
+  recruiter_contact: "Recruiter Chat",
   oa: "OA Pending",
   interview: "Interviewing",
   final_round: "Interviewing",
@@ -43,6 +44,7 @@ function inferActionType(
   nextAction: string | null
 ): string {
   if (pipelineStage === "OA Pending") return "oa";
+  if (pipelineStage === "Recruiter Chat") return "schedule";
   if (pipelineStage === "Needs Reply") return "reply";
   if (pipelineStage === "Interview Scheduling") return "schedule";
   if (
@@ -74,7 +76,7 @@ function buildSummary(
 ): string {
   return [
     company ?? "Unknown company",
-    role ? `— ${role}` : "",
+    role ? `· ${role}` : "",
     `(${stage})`,
   ]
     .filter(Boolean)
@@ -182,7 +184,7 @@ export async function extractRecruitingMessage(
   if (!isOllamaConfigured()) {
     return heuristicFallback(
       trimmed,
-      "Ollama not configured — used heuristic parser. Set OLLAMA_API_KEY in .env.local for AI extraction."
+      "Ollama not configured. Used heuristic parser. Set OLLAMA_API_KEY in .env.local for AI extraction."
     );
   }
 
@@ -225,7 +227,7 @@ export async function extractRecruitingMessage(
 }
 
 function getModelName(): string | null {
-  return process.env.OLLAMA_MODEL ?? "ministral-3:3b";
+  return getOllamaExtractionModel();
 }
 
 export function normalizeReviewedExtraction(

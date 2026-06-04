@@ -1,5 +1,6 @@
 export const STAGES = [
   "New",
+  "Recruiter Chat",
   "Needs Reply",
   "OA Pending",
   "Interview Scheduling",
@@ -8,6 +9,14 @@ export const STAGES = [
   "Offer",
   "Rejected",
   "Ghosted",
+] as const;
+
+/** Stages shown on the calendar page for scheduling recruiter calls / interviews */
+export const CALENDAR_SCHEDULING_STAGES = [
+  "Recruiter Chat",
+  "Needs Reply",
+  "Interview Scheduling",
+  "Interviewing",
 ] as const;
 
 export type Stage = (typeof STAGES)[number];
@@ -32,6 +41,7 @@ export type Tone = (typeof TONES)[number];
 
 export const STAGE_COLORS: Record<string, string> = {
   New: "bg-slate-100 text-slate-700",
+  "Recruiter Chat": "bg-purple-100 text-purple-800",
   "Needs Reply": "bg-amber-100 text-amber-800",
   "OA Pending": "bg-orange-100 text-orange-800",
   "Interview Scheduling": "bg-blue-100 text-blue-800",
