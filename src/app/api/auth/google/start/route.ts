@@ -6,30 +6,40 @@ import { buildGoogleAuthUrl } from "@/lib/google/oauth";
 import { getGoogleConfigError } from "@/lib/google/config";
 
 const STATE_COOKIE = "google_oauth_state";
+const RETURN_TO_COOKIE = "google_oauth_return_to";
 
-export async function GET() {
+export async function GET(request: Request) {
   const configError = getGoogleConfigError();
   if (configError) {
     return NextResponse.json({ error: configError }, { status: 500 });
   }
 
+  const url = new URL(request.url);
+  const returnTo = url.searchParams.get("return_to") ?? "/gmail";
+  const includeCalendar = url.searchParams.get("calendar") === "1";
+
   try {
     await requireUser();
   } catch {
-    return NextResponse.redirect(
-      new URL("/login?next=/gmail", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000")
-    );
+    const loginUrl = new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
+    loginUrl.searchParams.set("next", returnTo);
+    return NextResponse.redirect(loginUrl);
   }
 
   const state = randomBytes(24).toString("hex");
   const cookieStore = await cookies();
-  cookieStore.set(STATE_COOKIE, state, {
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     path: "/",
     maxAge: 600,
-  });
+  };
 
-  return NextResponse.redirect(buildGoogleAuthUrl(state));
+  cookieStore.set(STATE_COOKIE, state, cookieOptions);
+  cookieStore.set(RETURN_TO_COOKIE, returnTo, cookieOptions);
+
+  return NextResponse.redirect(
+    buildGoogleAuthUrl(state, { includeCalendar })
+  );
 }

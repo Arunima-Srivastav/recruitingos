@@ -1,6 +1,16 @@
 export const GMAIL_READONLY_SCOPE =
   "https://www.googleapis.com/auth/gmail.readonly";
 
+export const CALENDAR_EVENTS_SCOPE =
+  "https://www.googleapis.com/auth/calendar.events";
+
+export const GOOGLE_GMAIL_SCOPES = GMAIL_READONLY_SCOPE;
+
+export const GOOGLE_FULL_SCOPES = [
+  GMAIL_READONLY_SCOPE,
+  CALENDAR_EVENTS_SCOPE,
+].join(" ");
+
 export const RECRUITING_GMAIL_QUERY =
   '(recruiter OR internship OR interview OR "online assessment" OR "coding challenge" OR application OR "new grad" OR "software engineer")';
 
