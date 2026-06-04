@@ -1,4 +1,5 @@
 import Link from "next/link";
+import DraftContextForm from "@/components/DraftContextForm";
 import SignOutButton from "@/components/SignOutButton";
 import { getCurrentUser } from "@/lib/auth/server";
 
@@ -33,6 +34,10 @@ export default async function AccountPage() {
           </Link>
           <SignOutButton />
         </div>
+      </div>
+
+      <div className="mt-8">
+        <DraftContextForm />
       </div>
     </div>
   );

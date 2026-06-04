@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ConfigErrorBanner from "@/components/ConfigErrorBanner";
 import DraftCard from "@/components/DraftCard";
+import DraftContextForm from "@/components/DraftContextForm";
 import DuplicateOpportunityBanner from "@/components/DuplicateOpportunityBanner";
 import AddToCalendarLinks, {
   buildOpportunityExportHref,
@@ -33,6 +34,7 @@ export default function OpportunityDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [tone, setTone] = useState<Tone>("professional");
   const [generating, setGenerating] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -99,6 +101,7 @@ export default function OpportunityDetailPage() {
 
   async function generateDraft(draftType: string) {
     setGenerating(draftType);
+    setDraftNotice(null);
     try {
       const res = await fetch("/api/drafts/generate", {
         method: "POST",
@@ -112,6 +115,17 @@ export default function OpportunityDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to generate draft");
       setDrafts((prev) => [data.draft, ...prev]);
+      if (data.provider === "ollama") {
+        setDraftNotice(
+          data.model
+            ? `Draft generated with Ollama (${data.model}). Review before sending.`
+            : "Draft generated with Ollama. Review before sending."
+        );
+      } else {
+        setDraftNotice(
+          "Template draft (Ollama unavailable or failed). Add OLLAMA_API_KEY for AI drafts."
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Draft generation failed");
     } finally {
@@ -289,12 +303,18 @@ export default function OpportunityDetailPage() {
       )}
 
       <section id="drafts" className="mt-8">
-        <h2 className="mb-1 text-lg font-semibold text-slate-900">
+        <DraftContextForm compact showAccountLink />
+
+        <h2 className="mb-1 mt-6 text-lg font-semibold text-slate-900">
           Generate draft
         </h2>
         <p className="mb-3 text-xs text-slate-500">
-          MVP: template-based mock drafts (not sent automatically)
+          Uses Ollama (Mistral) when configured; otherwise template fallback. Not
+          sent automatically.
         </p>
+        {draftNotice && (
+          <p className="mb-3 text-xs text-indigo-700">{draftNotice}</p>
+        )}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <label className="text-sm text-slate-600">Tone:</label>
           <select
