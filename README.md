@@ -26,6 +26,7 @@ Students get recruiting information from everywhere: Gmail, LinkedIn, job postin
 - Opportunity detail page with messages, extracted JSON, drafts, and actions
 - Mock draft generation for replies, follow-ups, and scheduling
 - Gmail import with scan preview and selective import (read-only OAuth)
+- Discover page with public job boards (SimplifyJobs, Remotive, Arbeitnow)
 - Calendar view with iCal export and Google Calendar two-way sync
 - Supabase Auth (email/password) with per-user data isolation via RLS
 - Demo data seed endpoint (requires sign-in)
@@ -129,10 +130,11 @@ The seed endpoint is idempotent: if five or more opportunities already exist for
 2. **Sign in** (`/login`): email/password auth
 3. **Add Message** (`/intake`): paste message → Ollama extraction → review → save
 4. **Gmail** (`/gmail`): connect Gmail → scan → preview → import selected messages
-5. **Pipeline** (`/pipeline`): kanban board grouped by stage
-6. **Today** (`/today`): prioritized pending actions
-7. **Calendar** (`/calendar`): deadlines and action due dates, export to `.ics`
-8. **Opportunity detail** (`/opportunities/[id]`): stage updates, drafts, actions, messages
+5. **Discover** (`/discover`): browse public job boards → add roles to pipeline
+6. **Pipeline** (`/pipeline`): kanban board grouped by stage
+7. **Today** (`/today`): prioritized pending actions
+8. **Calendar** (`/calendar`): deadlines and action due dates, export to `.ics`
+9. **Opportunity detail** (`/opportunities/[id]`): stage updates, drafts, actions, messages
 
 ## Project structure
 
@@ -177,10 +179,33 @@ supabase/
 | `/api/gmail/scan` | POST | Scan inbox for recruiting messages |
 | `/api/gmail/import` | POST | Import selected messages through Ollama |
 | `/api/gmail/disconnect` | POST | Disconnect Gmail |
+| `/api/discover/sources` | GET | List configured job board sources |
+| `/api/discover/listings` | GET | Search listings from a source |
+| `/api/discover/import` | POST | Import selected listings to pipeline |
 | `/api/calendar/export` | GET | Download `.ics` for deadlines and due dates |
 | `/api/calendar/events` | GET | Month view data (recruiting + Google events) |
 | `/api/calendar/sync` | POST | Push recruiting deadlines/actions to Google Calendar |
 | `/api/calendar/status` | GET | Google Calendar connection and sync status |
+
+## Discover job boards
+
+The **Discover** page pulls from multiple public sources:
+
+| Source | Type | Notes |
+|--------|------|-------|
+| Simplify · Summer 2026 Internships | Internships | GitHub `listings.json`, updated daily |
+| Simplify · New Grad Positions | New grad | GitHub `listings.json` |
+| Greenhouse · Target Companies | General | Public boards API (Stripe, Figma, Databricks, and more) |
+| Himalayas · Remote Jobs | Remote | [Himalayas public API](https://himalayas.app/jobs/api) |
+| Jobicy · Remote Jobs | Remote | [Jobicy API](https://jobi.cy/apidocs) (attribution required) |
+| Remotive · Remote Jobs | Remote | Public Remotive API (software category) |
+| Arbeitnow · Job Board | General tech | Free public API, filtered to tech roles |
+
+Search by company, role, or location, select listings, then **Add selected to pipeline**. Use **Load more listings** to paginate when nothing matches on the first page. Imports are deduped by listing ID so the same job is not added twice.
+
+Discover imports map structured API fields directly to your pipeline (no LLM). Ollama/Mistral is only used for recruiter message extraction on Intake and Gmail.
+
+To add another board later, create a new adapter in `src/lib/discover/sources/` and register it in `sources/index.ts`.
 
 ## Calendar & Google sync
 
@@ -256,7 +281,7 @@ OAuth scope: `gmail.readonly` only. Tokens are stored in Supabase per user (RLS-
 
 ## Future work
 
-- Discover page for public GitHub job sources (e.g. SimplifyJobs)
+- More discover adapters (Adzuna, Greenhouse public boards, Handshake-style feeds)
 - Evaluation harness with labeled test set
 - DigitalOcean App Platform deployment
 
