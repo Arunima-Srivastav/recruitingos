@@ -2,6 +2,8 @@ import {
   createAction,
   createMessage,
   createOpportunity,
+  getOpportunityById,
+  updateOpportunityStage,
 } from "@/lib/db";
 import { calculatePriority } from "@/lib/prioritizer";
 import type { ExtractedRecruitingData } from "@/lib/types";
@@ -16,9 +18,43 @@ export interface SaveMessageInput {
   receivedAt?: string | null;
 }
 
+export async function appendMessageToOpportunity(
+  opportunityId: string,
+  input: SaveMessageInput
+): Promise<{ opportunity_id: string; linked: true }> {
+  const source = input.source ?? "manual";
+  const extracted = input.extracted;
+  const existing = await getOpportunityById(opportunityId);
+  if (!existing) {
+    throw new Error("Opportunity not found");
+  }
+
+  await createMessage({
+    opportunity_id: opportunityId,
+    source,
+    sender_name: extracted.recruiter_name,
+    sender_email: extracted.recruiter_email,
+    subject: input.subject ?? null,
+    body: input.text.trim(),
+    snippet: input.snippet ?? null,
+    received_at: input.receivedAt ?? new Date().toISOString(),
+    extracted_json: extracted,
+    external_message_id: input.externalMessageId ?? null,
+    extraction_status: extracted.extraction_status ?? null,
+    extraction_confidence: extracted.confidence ?? null,
+    needs_review: extracted.needs_review ?? false,
+  });
+
+  if (extracted.stage && extracted.stage !== existing.stage) {
+    await updateOpportunityStage(opportunityId, extracted.stage);
+  }
+
+  return { opportunity_id: opportunityId, linked: true };
+}
+
 export async function saveOpportunityFromMessage(
   input: SaveMessageInput
-): Promise<{ opportunity_id: string }> {
+): Promise<{ opportunity_id: string; linked?: boolean }> {
   const source = input.source ?? "manual";
   const extracted = input.extracted;
 
@@ -27,6 +63,7 @@ export async function saveOpportunityFromMessage(
     action_type: extracted.action_type,
     deadline: extracted.deadline,
     created_at: new Date().toISOString(),
+    source,
   });
 
   const opportunity = await createOpportunity({
@@ -67,6 +104,7 @@ export async function saveOpportunityFromMessage(
       deadline: extracted.deadline,
       due_at: extracted.deadline,
       created_at: new Date().toISOString(),
+      source,
     });
 
     await createAction({

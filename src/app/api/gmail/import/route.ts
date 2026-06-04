@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { extractRecruitingMessage } from "@/lib/ai/extract";
 import { fetchGmailMessage } from "@/lib/google/gmail";
 import { getValidGoogleAccessToken } from "@/lib/google/oauth";
-import { saveOpportunityFromMessage } from "@/lib/intake/saveMessage";
+import { saveOrLinkOpportunityFromMessage } from "@/lib/dedup/import";
 import { getMessageByExternalId } from "@/lib/db";
 
 export async function POST(request: Request) {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const accessToken = await getValidGoogleAccessToken();
     const results: Array<{
       messageId: string;
-      status: "imported" | "skipped";
+      status: "imported" | "linked" | "skipped";
       opportunity_id?: string;
       reason?: string;
     }> = [];
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         recruiter_email:
           extraction.data.recruiter_email ?? parsed.senderEmail,
       };
-      const saved = await saveOpportunityFromMessage({
+      const saved = await saveOrLinkOpportunityFromMessage({
         text: fullText,
         source: "gmail",
         extracted,
@@ -66,12 +66,15 @@ export async function POST(request: Request) {
 
       results.push({
         messageId,
-        status: "imported",
+        status: saved.linked ? "linked" : "imported",
         opportunity_id: saved.opportunity_id,
+        reason: saved.duplicate_reason,
       });
     }
 
-    const imported = results.filter((r) => r.status === "imported").length;
+    const imported = results.filter(
+      (r) => r.status === "imported" || r.status === "linked"
+    ).length;
     const skipped = results.filter((r) => r.status === "skipped").length;
 
     return NextResponse.json({

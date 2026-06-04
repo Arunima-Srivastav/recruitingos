@@ -7,7 +7,7 @@ import {
   listingToExtracted,
 } from "@/lib/discover/format";
 import { getDiscoverSource, parseListingKey } from "@/lib/discover/sources";
-import { saveOpportunityFromMessage } from "@/lib/intake/saveMessage";
+import { saveOrLinkOpportunityFromMessage } from "@/lib/dedup/import";
 
 export async function POST(request: Request) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     const results: Array<{
       key: string;
-      status: "imported" | "skipped";
+      status: "imported" | "linked" | "skipped";
       opportunity_id?: string;
       reason?: string;
     }> = [];
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       }
 
       const extracted = listingToExtracted(listing);
-      const saved = await saveOpportunityFromMessage({
+      const saved = await saveOrLinkOpportunityFromMessage({
         text: formatListingAsMessage(listing),
         source: "discover",
         extracted,
@@ -69,12 +69,15 @@ export async function POST(request: Request) {
 
       results.push({
         key,
-        status: "imported",
+        status: saved.linked ? "linked" : "imported",
         opportunity_id: saved.opportunity_id,
+        reason: saved.duplicate_reason,
       });
     }
 
-    const imported = results.filter((r) => r.status === "imported").length;
+    const imported = results.filter(
+      (r) => r.status === "imported" || r.status === "linked"
+    ).length;
     const skipped = results.filter((r) => r.status === "skipped").length;
 
     return NextResponse.json({ imported, skipped, results });
