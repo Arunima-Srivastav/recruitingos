@@ -25,7 +25,7 @@ Students get recruiting information from everywhere: Gmail, LinkedIn, job postin
 - **Dedup**: fuzzy company/role + shared apply URL matching; merge duplicates; auto-link Gmail/Discover imports
 - **Priority**: scores on a **1-10** scale (higher = more urgent on Today and pipeline sort)
 - **Auth**: Supabase email/password, per-user RLS
-- **Drafts**: template-based reply / follow-up / scheduling (AI drafts planned next)
+- **Drafts**: Ollama (Mistral) reply / follow-up / scheduling with template fallback
 - Demo seed data (`POST /api/seed`, sign-in required)
 
 ## Prerequisites
@@ -75,6 +75,7 @@ If upgrading an older database, also run in order:
 | [`003_auth_rls.sql`](supabase/migrations/003_auth_rls.sql) | Per-user RLS |
 | [`004_calendar_sync.sql`](supabase/migrations/004_calendar_sync.sql) | Calendar sync links |
 | [`005_user_calendar_events.sql`](supabase/migrations/005_user_calendar_events.sql) | Custom calendar events |
+| [`006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) | Resume and highlights for AI drafts |
 
 **Note:** Data under the old `demo-user` id will not appear after you sign in with a real account.
 
@@ -157,7 +158,9 @@ Enable **Google Calendar API** on the same OAuth client as Gmail. Connect from t
 | `/api/ai/extract-message` | POST | Ollama/heuristic extraction |
 | `/api/intake` | POST | Save reviewed opportunity |
 | `/api/seed` | POST | Demo data |
-| `/api/drafts/generate` | POST | Template drafts |
+| `/api/drafts/generate` | POST | AI drafts (Ollama Mistral) with template fallback |
+| `/api/account/draft-context` | GET, PUT | Resume and highlights for draft generation |
+| `/api/account/draft-context/upload` | POST | Parse PDF / text resume upload |
 | `/api/opportunities/update-stage` | POST | Change stage |
 | `/api/opportunities/duplicates` | GET | List possible duplicates |
 | `/api/opportunities/merge` | POST | Merge two opportunities |
@@ -216,12 +219,19 @@ OAuth: `gmail.readonly` for mail; calendar scopes added when syncing calendar.
 - Gmail scan is manual (no background sync)
 - Google Calendar sync is manual (no webhooks)
 - Google-side edits do not update pipeline data
-- Drafts are template-based (not Ollama-generated yet)
+- Drafts require `OLLAMA_API_KEY` for AI output; otherwise templates are used
 - Scheduling availability in drafts is placeholder text
+
+## Draft generation
+
+On an opportunity page, choose tone and generate **Reply**, **Follow-up**, or **Scheduling** drafts. The API calls Ollama Cloud with the same Mistral model as extraction (`ministral-3:3b` by default). If Ollama is missing or errors, a template draft is returned instead. Drafts are never sent automatically.
+
+**Resume and highlights:** On **Account** or the opportunity **Generate draft** section, upload a **PDF**, `.txt`, or `.md` resume (PDF text is extracted on the server), or paste resume text directly. Add bullet points you want emphasized. That context is stored per user and included in AI draft prompts.
+
+Run [`supabase/migrations/006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) when upgrading an existing database.
 
 ## Roadmap
 
-- **ai-drafts**: Ollama/Mistral-generated replies with template fallback
 - **evaluation**: labeled fixtures + extraction accuracy harness
 - **deploy-polish**: DigitalOcean App Platform, production OAuth redirects
 
