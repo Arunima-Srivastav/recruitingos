@@ -26,7 +26,8 @@ Students get recruiting information from everywhere: Gmail, LinkedIn, job postin
 - **Priority**: scores on a **1-10** scale (higher = more urgent on Today and pipeline sort)
 - **Auth**: Supabase email/password, per-user RLS
 - **Drafts**: Ollama (Mistral) reply / follow-up / scheduling with template fallback
-- Demo seed data (`POST /api/seed`, sign-in required)
+- **Account & draft context**: per-user resume upload (PDF / text) and highlight bullets for AI drafts
+- **Demo seed data**: load from Home (`Load Demo Data`) or `POST /api/seed` while signed in
 
 ## Prerequisites
 
@@ -46,8 +47,16 @@ npm install
 
 ### 2. Configure environment variables
 
+**macOS / Linux:**
+
 ```bash
 cp .env.example .env.local
+```
+
+**Windows (PowerShell or CMD):**
+
+```powershell
+copy .env.example .env.local
 ```
 
 | Variable | Required | Description |
@@ -65,17 +74,25 @@ cp .env.example .env.local
 ### 3. Database and auth
 
 1. **Authentication → Providers**: enable **Email** (disable email confirmation for local dev if you want instant sign-in).
-2. **SQL Editor**: run [`supabase/schema.sql`](supabase/schema.sql) for a fresh project.
+2. **Authentication → URL configuration**: add `http://localhost:3000/**` to redirect URLs for local dev.
+3. **SQL Editor** — run both scripts below for a **new** project:
 
-If upgrading an older database, also run in order:
+| Script | Required for | Purpose |
+|--------|--------------|---------|
+| [`supabase/schema.sql`](supabase/schema.sql) | Everyone | Core tables, Gmail fields, RLS, calendar sync |
+| [`supabase/migrations/006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) | Account / resume / AI drafts | `user_draft_context` table |
 
-| Migration | Purpose |
-|-----------|---------|
-| [`002_gmail.sql`](supabase/migrations/002_gmail.sql) | Gmail fields on messages |
-| [`003_auth_rls.sql`](supabase/migrations/003_auth_rls.sql) | Per-user RLS |
-| [`004_calendar_sync.sql`](supabase/migrations/004_calendar_sync.sql) | Calendar sync links |
-| [`005_user_calendar_events.sql`](supabase/migrations/005_user_calendar_events.sql) | Custom calendar events |
-| [`006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) | Resume and highlights for AI drafts |
+[`schema.sql`](supabase/schema.sql) is the consolidated baseline for new installs (it already includes what migrations `002`–`005` added historically). Migration **`006` is still required** on fresh projects — resume and highlight storage is not in `schema.sql`.
+
+**Upgrading an older database** (created before those pieces existed): run any missing migrations **in order**:
+
+| Migration | Purpose | Already in `schema.sql`? |
+|-----------|---------|--------------------------|
+| [`002_gmail.sql`](supabase/migrations/002_gmail.sql) | Gmail fields on messages | Yes |
+| [`003_auth_rls.sql`](supabase/migrations/003_auth_rls.sql) | Per-user RLS | Yes |
+| [`004_calendar_sync.sql`](supabase/migrations/004_calendar_sync.sql) | Calendar sync links | Yes |
+| [`005_user_calendar_events.sql`](supabase/migrations/005_user_calendar_events.sql) | Custom calendar events | Yes |
+| [`006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) | Resume and highlights for AI drafts | **No — run this** |
 
 **Note:** Data under the old `demo-user` id will not appear after you sign in with a real account.
 
@@ -112,6 +129,26 @@ npm run build
 ```
 
 Then start the app (`npm run dev`), sign in, and walk through the [manual smoke test](#manual-smoke-test) below.
+
+**Continuous integration:** There is no GitHub Actions workflow checked in yet. Tests run locally via `npm test`. To add CI, run the [pre-release checklist](#5-testing-and-evaluation) on every push — for example:
+
+```yaml
+# .github/workflows/test.yml (example)
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: npm test
+      - run: npm run eval:extract
+      - run: npm run lint
+      - run: npm run build
+```
+
+Ollama eval (`eval:extract:ollama`) is optional in CI — it needs a secret `OLLAMA_API_KEY` and calls a live API.
 
 #### Unit test coverage
 
@@ -191,6 +228,8 @@ For each fixture, the harness runs the extractor and compares output to `expecte
 
 ##### Results (heuristic parser)
 
+> **Note:** Accuracy tables below reflect a point-in-time run of `npm run eval:extract`. Re-run that command after changing fixtures or [`src/lib/mockExtractor.ts`](src/lib/mockExtractor.ts) and update this section if numbers shift.
+
 Last run: **`npm run eval:extract`** — heuristic fallback parser ([`src/lib/mockExtractor.ts`](src/lib/mockExtractor.ts)), no Ollama.
 
 **Overall**
@@ -253,6 +292,8 @@ npm run eval:extract:ollama
 
 This uses the same fixtures and scoring but calls [`extractRecruitingMessage`](src/lib/ai/extract.ts) with Mistral (`ministral-3:3b` by default). Results vary by model and API availability — re-run after changing `OLLAMA_MODEL` or prompts. The CLI uses a **50%** minimum threshold for Ollama (vs **75%** for heuristic in CI).
 
+**Recorded Ollama results:** Not benchmarked in-repo (requires `OLLAMA_API_KEY` in `.env.local`). After configuring Ollama, run `npm run eval:extract:ollama` and paste the summary here or in your report. Expect field accuracy to differ from the heuristic baseline — Ollama maps through [AI stages → pipeline stages](#message-extraction-ollama) before scoring.
+
 ##### Adding a fixture
 
 1. Add an entry to [`src/lib/evaluation/fixtures/recruiting-messages.json`](src/lib/evaluation/fixtures/recruiting-messages.json).
@@ -284,13 +325,13 @@ Use this after `npm run dev` with Supabase configured. Optional columns need the
 | Step | Page / action | Verify | Requires |
 |------|---------------|--------|----------|
 | 1 | `/login` | Sign up or sign in | Supabase |
-| 2 | `POST /api/seed` (while signed in) | Demo pipeline populates | Supabase |
+| 2 | `/` → **Load Demo Data** (or `POST /api/seed`) | Demo pipeline populates | Supabase |
 | 3 | `/intake` | Paste message → extract → save → card on Pipeline | Supabase; Ollama optional |
 | 4 | `/pipeline` | Drag card between columns; change stage dropdown | Supabase |
 | 5 | `/today` | Actions and “Needs your reply” appear with priority | Supabase |
 | 6 | `/discover` | Browse a board → import → card appears | Supabase + network |
 | 7 | `/opportunities/[id]` | View messages, complete action, generate draft | Supabase; Ollama optional for AI draft |
-| 8 | Account / draft context | Upload or paste resume + highlights | Supabase + migration `006` |
+| 8 | `/account` | Upload or paste resume + highlights | Supabase + migration `006` |
 | 9 | `/gmail` | Connect → scan → import selected | Google OAuth + Supabase |
 | 10 | `/calendar` | View events, sync to Google, export `.ics` | Google OAuth + Calendar API |
 
@@ -305,7 +346,7 @@ Open [http://localhost:3000](http://localhost:3000) and repeat sign-in + one int
 
 ## Core user flow
 
-1. **Home** (`/`): overview and quick links
+1. **Home** (`/`): overview, quick links, **Load Demo Data** button
 2. **Sign in** (`/login`): email/password
 3. **Add Message** (`/intake`): paste → extract → review → save
 4. **Gmail** (`/gmail`): connect → scan → import selected
@@ -314,6 +355,42 @@ Open [http://localhost:3000](http://localhost:3000) and repeat sign-in + one int
 7. **Today** (`/today`): prioritized actions and reply detection
 8. **Calendar** (`/calendar`): deadlines, Google sync, export
 9. **Opportunity** (`/opportunities/[id]`): messages, actions, drafts, merge duplicates
+10. **Account** (`/account`): sign-out, Gmail shortcut, resume and highlights for drafts
+
+### Demo seed data
+
+The home page **Load Demo Data** button calls `POST /api/seed` (sign-in required). It creates five sample opportunities if the pipeline is empty; a second click returns `"Demo data already exists"`.
+
+From the browser console while signed in:
+
+```javascript
+fetch("/api/seed", { method: "POST" }).then((r) => r.json()).then(console.log)
+```
+
+Or with curl after copying your session cookie from DevTools → Application → Cookies:
+
+```bash
+curl -X POST http://localhost:3000/api/seed -H "Cookie: YOUR_SESSION_COOKIE"
+```
+
+## Pipeline stages
+
+Kanban columns and stage dropdowns use these values (in order). Dragging or updating stage recalculates priority.
+
+| Stage | Typical meaning |
+|-------|-----------------|
+| **New** | First touch, not yet actioned |
+| **Recruiter Chat** | Scheduling a recruiter call |
+| **Needs Reply** | Waiting on your response |
+| **OA Pending** | Online assessment to complete |
+| **Interview Scheduling** | Coordinating interview times |
+| **Interviewing** | Interviews in progress or completed; waiting on company |
+| **Waiting** | Applied or idle; no immediate action |
+| **Offer** | Offer received |
+| **Rejected** | Closed — rejection |
+| **Ghosted** | Closed — no response |
+
+Inactive stages (**Rejected**, **Ghosted**) are pinned to minimum priority (**1/10**). **Offer** is treated as inactive for “needs reply” detection.
 
 ## Priority scoring (1-10)
 
@@ -344,6 +421,19 @@ Older rows saved before the 1-10 scale may still have larger numbers in the data
 
 Imports map API fields directly (no LLM). Add adapters in `src/lib/discover/sources/` and register in `sources/index.ts`.
 
+### Job board attribution
+
+Some Discover sources require attribution. When a source defines an `attribution` object, the Discover page shows a footer while that source is selected:
+
+> Job listings courtesy of **Jobicy**. Apply on their site.
+
+| Source | Attribution link | Where it appears |
+|--------|------------------|------------------|
+| **Jobicy** | [jobicy.com](https://jobicy.com/) | Footer on `/discover` when Jobicy is the active source ([`src/lib/discover/sources/jobicy.ts`](src/lib/discover/sources/jobicy.ts)) |
+| **Himalayas** | [himalayas.app](https://himalayas.app/) | Same footer pattern when Himalayas is selected |
+
+Listings still import into your pipeline; apply links point to the external board. To add attribution for a new adapter, set `attribution: { label, href }` on the `DiscoverSource` in `src/lib/discover/sources/`.
+
 ## Calendar and Google sync
 
 - **Indigo**: Recruiting OS (pipeline deadlines, actions, custom events)
@@ -360,7 +450,7 @@ Enable **Google Calendar API** on the same OAuth client as Gmail. Connect from t
 |-------|--------|---------|
 | `/api/ai/extract-message` | POST | Ollama/heuristic extraction |
 | `/api/intake` | POST | Save reviewed opportunity |
-| `/api/seed` | POST | Demo data |
+| `/api/seed` | POST | Demo data (also triggered by Home → Load Demo Data) |
 | `/api/drafts/generate` | POST | AI drafts (Ollama Mistral) with template fallback |
 | `/api/account/draft-context` | GET, PUT | Resume and highlights for draft generation |
 | `/api/account/draft-context/upload` | POST | Parse PDF / text resume upload |
@@ -370,9 +460,41 @@ Enable **Google Calendar API** on the same OAuth client as Gmail. Connect from t
 | `/api/opportunities/delete` | POST | Delete opportunity |
 | `/api/actions/complete` | POST | Complete action |
 | `/api/replies` | GET | Needs-reply items for Today/home |
-| `/api/gmail/*` | various | Gmail OAuth, scan, import |
-| `/api/discover/*` | various | Sources, listings, import |
-| `/api/calendar/*` | various | Events, export, sync, schedule |
+| `/api/auth/google/start` | GET | Begin Google OAuth (Gmail / Calendar); redirects to Google |
+| `/api/auth/google/callback` | GET | OAuth callback; stores tokens in `google_connections` |
+| `/api/gmail/status` | GET | Connection status |
+| `/api/gmail/scan` | POST | Scan inbox for recruiting messages |
+| `/api/gmail/import` | POST | Import selected messages |
+| `/api/gmail/disconnect` | POST | Revoke local Google connection |
+| `/api/discover/sources` | GET | List job board sources |
+| `/api/discover/listings` | GET | Paginated listings for a source |
+| `/api/discover/import` | POST | Import listing to pipeline |
+| `/api/calendar/events` | GET | Calendar events (pipeline + Google) |
+| `/api/calendar/export` | GET | Download `.ics` |
+| `/api/calendar/sync` | POST | Push events to Google Calendar |
+| `/api/calendar/schedule` | POST | Schedule recruiter call / interview |
+| `/api/calendar/status` | GET | Google Calendar connection status |
+| `/api/calendar/remove` | POST | Remove event from calendar / Google |
+| `/api/calendar/import-to-pipeline` | POST | Import gray Google event as opportunity |
+
+Protected pages (`/pipeline`, `/intake`, `/gmail`, etc.) require Supabase auth via [`src/middleware.ts`](src/middleware.ts). API routes call `requireUser()` and rely on RLS for row isolation.
+
+## Data model
+
+Postgres tables in Supabase (see [`supabase/schema.sql`](supabase/schema.sql) and migrations):
+
+| Table | Purpose | Key fields |
+|-------|---------|------------|
+| `opportunities` | Pipeline cards | `company`, `role_title`, `stage`, `priority_score`, `deadline`, `next_action`, `source`, `user_id` |
+| `messages` | Raw + extracted message bodies | `body`, `extracted_json`, `external_message_id`, `extraction_status`, `needs_review`, `opportunity_id` |
+| `actions` | To-dos surfaced on Today | `action_type`, `title`, `due_at`, `status`, `priority_score`, `opportunity_id` |
+| `drafts` | Generated reply / follow-up / scheduling text | `draft_type`, `tone`, `body`, `opportunity_id` |
+| `google_connections` | OAuth tokens per user | `access_token`, `refresh_token`, `google_email`, `calendar_sync_enabled` |
+| `calendar_event_links` | Maps pipeline items → Google event IDs | `source_kind`, `source_id`, `google_event_id` |
+| `user_calendar_events` | Custom all-day / timed events | `title`, `starts_at`, `ends_at`, `opportunity_id` |
+| `user_draft_context` | Resume + highlights for AI drafts (migration `006`) | `resume_text`, `highlights_text`, `resume_filename`, `user_id` |
+
+All user-owned rows use `user_id` matching `auth.uid()` with **row-level security** policies.
 
 ## Project structure
 
@@ -411,6 +533,25 @@ OLLAMA_MODEL=ministral-3:3b
 
 Without `OLLAMA_API_KEY`, intake and Gmail import use the heuristic parser.
 
+### Message extraction (Ollama)
+
+When Ollama is configured, [`extractRecruitingMessage`](src/lib/ai/extract.ts) asks Mistral for structured JSON, validates it with Zod, then maps **AI stages** to **pipeline stages** stored on opportunities:
+
+| AI stage (`ai_stage`) | Pipeline stage |
+|-----------------------|----------------|
+| `sourced`, `saved`, `unknown` | New |
+| `applied` | Waiting |
+| `recruiter_contact` | Recruiter Chat |
+| `oa` | OA Pending |
+| `interview`, `final_round` | Interviewing |
+| `offer` | Offer |
+| `rejected` | Rejected |
+| `archived` | Ghosted |
+
+The model also returns `nextAction`, `deadline`, `priority`, and confidence. Low confidence or validation failures fall back to the heuristic parser (`provider: heuristic`, `extraction_status: fallback`). Eval fixtures label **pipeline** fields — the same values users see after review on Intake.
+
+Heuristic-only extraction ([`mockExtract`](src/lib/mockExtractor.ts)) classifies stages directly (e.g. **Needs Reply**, **Interview Scheduling**) without the AI stage indirection; see [extraction evaluation](#extraction-evaluation).
+
 ## Gmail setup
 
 1. [Google Cloud Console](https://console.cloud.google.com/): OAuth **Web application** client.
@@ -432,14 +573,55 @@ OAuth: `gmail.readonly` for mail; calendar scopes added when syncing calendar.
 
 On an opportunity page, choose tone and generate **Reply**, **Follow-up**, or **Scheduling** drafts. The API calls Ollama Cloud with the same Mistral model as extraction (`ministral-3:3b` by default). If Ollama is missing or errors, a template draft is returned instead. Drafts are never sent automatically.
 
-**Resume and highlights:** On **Account** or the opportunity **Generate draft** section, upload a **PDF**, `.txt`, or `.md` resume (PDF text is extracted on the server), or paste resume text directly. Add bullet points you want emphasized. That context is stored per user and included in AI draft prompts.
+**Resume and highlights:** On **Account** (`/account`) or the opportunity **Generate draft** section, upload a **PDF**, `.txt`, or `.md` resume (PDF text is extracted on the server), or paste resume text directly. Add bullet points you want emphasized. That context is stored per user in `user_draft_context` and included in AI draft prompts. Requires migration [`006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) (included in [fresh install setup](#3-database-and-auth)).
 
-Run [`supabase/migrations/006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) when upgrading an existing database.
+## Production deployment
+
+Planned target: **DigitalOcean App Platform** (see [Roadmap](#roadmap)). Until that is automated, use this checklist:
+
+### 1. Supabase (production)
+
+- Create or reuse a Supabase project.
+- Run [`schema.sql`](supabase/schema.sql) + [`006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql).
+- **Authentication → URL configuration**: add your production app URL (e.g. `https://your-app.ondigitalocean.app/**`).
+- Enable Email auth; configure SMTP if you require email confirmation.
+
+### 2. Environment variables (production)
+
+| Variable | Example / notes |
+|----------|-----------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `NEXT_PUBLIC_APP_URL` | `https://your-app.ondigitalocean.app` |
+| `GOOGLE_REDIRECT_URI` | `https://your-app.ondigitalocean.app/api/auth/google/callback` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Same OAuth client as local, with prod redirect URI added in Google Console |
+| `OLLAMA_API_KEY` | Optional; heuristic fallback if unset |
+
+### 3. Google Cloud Console
+
+- Add the **production** redirect URI to the OAuth client (in addition to localhost for dev).
+- Keep **Gmail API** and **Google Calendar API** enabled.
+
+### 4. Deploy (DigitalOcean App Platform)
+
+1. Connect the GitHub repo; set build command `npm run build`, run command `npm start`.
+2. Add all env vars above in the App Platform dashboard.
+3. After deploy, smoke-test: sign in → intake → pipeline → optional Gmail connect.
+
+### 5. Post-deploy verification
+
+```bash
+npm test
+npm run eval:extract
+npm run build
+```
+
+Run locally before each release; optionally run `npm run eval:extract:ollama` when validating prompt changes.
 
 ## Roadmap
 
-- ~~**evaluation**: labeled fixtures + extraction accuracy harness~~ (see `src/lib/evaluation/`)
-- **deploy-polish**: DigitalOcean App Platform, production OAuth redirects
+- ~~**evaluation**: labeled fixtures + extraction accuracy harness~~ (see [Testing and evaluation](#5-testing-and-evaluation))
+- **deploy-polish**: DigitalOcean App Platform deploy config, production OAuth redirects (checklist started in [Production deployment](#production-deployment))
 
 ## Troubleshooting
 
@@ -449,8 +631,9 @@ Run [`supabase/migrations/006_user_draft_context.sql`](supabase/migrations/006_u
 | Redirected to `/login` | Sign in; protected routes require auth |
 | Empty pipeline after sign-in | Old `demo-user` data is orphaned; seed or add messages |
 | API 401 | Sign in first |
-| API 500 | Run `schema.sql` and migrations in Supabase |
-| Gmail connect fails | Redirect URI must match Google Console exactly |
+| API 500 | Run `schema.sql` and `006_user_draft_context.sql` in Supabase |
+| Draft context / Account 500 | Run [`006_user_draft_context.sql`](supabase/migrations/006_user_draft_context.sql) |
+| Gmail connect fails | Redirect URI must match Google Console exactly (localhost vs production) |
 | Priority looks wrong on old data | Re-import or edit stage; new saves use 1-10 |
 | Build fails | `npm install`, Node 20+, `npm run build` |
 | Extraction eval fails in CI | Run `npm run eval:extract` for per-field failures; check [`src/lib/mockExtractor.ts`](src/lib/mockExtractor.ts) |
