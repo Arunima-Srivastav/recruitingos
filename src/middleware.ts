@@ -6,6 +6,7 @@ const PROTECTED_PREFIXES = [
   "/intake",
   "/today",
   "/gmail",
+  "/discover",
   "/account",
   "/calendar",
   "/opportunities",

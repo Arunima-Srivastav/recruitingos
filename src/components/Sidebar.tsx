@@ -8,6 +8,7 @@ const links = [
   { href: "/", label: "Dashboard", icon: "⌂" },
   { href: "/intake", label: "Add Message", icon: "✉" },
   { href: "/gmail", label: "Gmail", icon: "📥" },
+  { href: "/discover", label: "Discover", icon: "🔍" },
   { href: "/pipeline", label: "Pipeline", icon: "▦" },
   { href: "/today", label: "Today", icon: "◎" },
   { href: "/calendar", label: "Calendar", icon: "📅" },

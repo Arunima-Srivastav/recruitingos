@@ -26,6 +26,7 @@ export const SOURCES = [
   { value: "linkedin", label: "LinkedIn" },
   { value: "gmail", label: "Gmail" },
   { value: "job_post", label: "Job Post" },
+  { value: "discover", label: "Discover" },
 ] as const;
 
 export const DRAFT_TYPES = ["reply", "follow_up", "scheduling"] as const;

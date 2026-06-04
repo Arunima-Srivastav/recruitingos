@@ -9,6 +9,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/intake", label: "Add Message" },
   { href: "/gmail", label: "Gmail" },
+  { href: "/discover", label: "Discover" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/today", label: "Today" },
   { href: "/calendar", label: "Calendar" },
