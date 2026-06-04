@@ -4,10 +4,11 @@ import {
   createDraft,
   getMessagesForOpportunity,
   getOpportunityById,
+  getUserDraftContext,
 } from "@/lib/db";
 import type { DraftType, Tone } from "@/lib/constants";
 import { DRAFT_TYPES, TONES } from "@/lib/constants";
-import { generateMockDraft } from "@/lib/mockDraftGenerator";
+import { generateDraftBody } from "@/lib/ai/draft";
 
 export async function POST(request: Request) {
   try {
@@ -51,22 +52,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const messages = await getMessagesForOpportunity(opportunity_id);
-    const draftBody = generateMockDraft({
+    const [messages, draftContext] = await Promise.all([
+      getMessagesForOpportunity(opportunity_id),
+      getUserDraftContext(),
+    ]);
+    const generated = await generateDraftBody({
       opportunity,
       messages,
       draftType: draft_type as DraftType,
       tone: tone as Tone,
+      draftContext,
     });
 
     const draft = await createDraft({
       opportunity_id,
       draft_type,
       tone,
-      body: draftBody,
+      body: generated.body,
     });
 
-    return NextResponse.json({ draft });
+    return NextResponse.json({
+      draft,
+      provider: generated.provider,
+      model: generated.model ?? null,
+    });
   } catch (err) {
     return handleApiError(err, "Failed to generate draft");
   }

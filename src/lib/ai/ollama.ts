@@ -2,7 +2,7 @@ import {
   EXTRACTION_SYSTEM_PROMPT,
   buildExtractionUserPrompt,
 } from "./prompts";
-import { getOllamaExtractionModel } from "./model";
+import { getOllamaModel } from "./model";
 
 export interface OllamaConfig {
   apiKey: string;
@@ -20,7 +20,7 @@ export function getOllamaConfig(): OllamaConfig | null {
       /\/$/,
       ""
     ),
-    model: getOllamaExtractionModel(),
+    model: getOllamaModel(),
   };
 }
 
@@ -36,23 +36,28 @@ interface OllamaChatResponse {
 export async function chatWithOllama(
   config: OllamaConfig,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  options?: { json?: boolean }
 ): Promise<{ content: string; model: string }> {
+  const body: Record<string, unknown> = {
+    model: config.model,
+    stream: false,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  };
+  if (options?.json !== false) {
+    body.format = "json";
+  }
+
   const res = await fetch(`${config.baseUrl}/api/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.apiKey}`,
     },
-    body: JSON.stringify({
-      model: config.model,
-      stream: false,
-      format: "json",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
+    body: JSON.stringify(body),
   });
 
   const data = (await res.json()) as OllamaChatResponse;
@@ -83,7 +88,8 @@ export async function extractWithOllama(
   const { content, model } = await chatWithOllama(
     config,
     EXTRACTION_SYSTEM_PROMPT,
-    buildExtractionUserPrompt(rawText, sourceType)
+    buildExtractionUserPrompt(rawText, sourceType),
+    { json: true }
   );
 
   return { rawOutput: content, model };
