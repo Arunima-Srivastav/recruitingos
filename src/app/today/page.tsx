@@ -8,6 +8,7 @@ import NeedsReplyPanel from "@/components/NeedsReplyPanel";
 import { getSupabaseConfigError } from "@/lib/config";
 import Link from "next/link";
 import { getSupabase } from "@/lib/supabase";
+import { normalizeStoredPriorityScore } from "@/lib/prioritizer";
 import type { NeedsReplyItem } from "@/lib/replies/detect";
 import type { ActionWithOpportunity, Opportunity } from "@/lib/types";
 
@@ -43,12 +44,25 @@ export default function TodayPage() {
       if (actionsRes.error) throw actionsRes.error;
 
       setActions(
-        (actionsRes.data ?? []).map((row) => {
-          const { opportunity, ...action } = row as typeof row & {
-            opportunity: Opportunity | null;
-          };
-          return { ...action, opportunity } as ActionWithOpportunity;
-        })
+        (actionsRes.data ?? [])
+          .map((row) => {
+            const { opportunity, ...action } = row as typeof row & {
+              opportunity: Opportunity | null;
+            };
+            return {
+              ...action,
+              priority_score: normalizeStoredPriorityScore(action.priority_score),
+              opportunity: opportunity
+                ? {
+                    ...opportunity,
+                    priority_score: normalizeStoredPriorityScore(
+                      opportunity.priority_score
+                    ),
+                  }
+                : opportunity,
+            } as ActionWithOpportunity;
+          })
+          .sort((a, b) => b.priority_score - a.priority_score)
       );
 
       if (repliesRes.ok) {

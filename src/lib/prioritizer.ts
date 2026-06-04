@@ -1,5 +1,8 @@
 import type { PriorityResult } from "./types";
 
+export const MIN_PRIORITY = 1;
+export const MAX_PRIORITY = 10;
+
 interface PriorityInput {
   stage?: string | null;
   action_type?: string | null;
@@ -11,13 +14,15 @@ interface PriorityInput {
 }
 
 const SOURCE_BOOST: Record<string, number> = {
-  gmail: 12,
-  manual: 6,
-  linkedin: 6,
-  job_post: 4,
+  gmail: 1,
+  manual: 0.5,
+  linkedin: 0.5,
+  job_post: 0.3,
   discover: 0,
-  calendar: 2,
+  calendar: 0.2,
 };
+
+const INACTIVE_STAGES = new Set(["Rejected", "Ghosted"]);
 
 function hoursUntil(dateStr: string): number | null {
   const date = new Date(dateStr);
@@ -40,55 +45,72 @@ function isWithinLastHours(dateStr: string | null | undefined, hours: number): b
   return diffHours >= 0 && diffHours <= hours;
 }
 
+function clampPriority(score: number): number {
+  return Math.min(MAX_PRIORITY, Math.max(MIN_PRIORITY, Math.round(score)));
+}
+
+/** Maps legacy 0-100+ stored scores to the current 1-10 scale. */
+export function normalizeStoredPriorityScore(stored: number): number {
+  if (!Number.isFinite(stored)) return MIN_PRIORITY;
+  if (stored <= MAX_PRIORITY) {
+    return clampPriority(stored);
+  }
+  return clampPriority(stored / 10);
+}
+
 export function calculatePriority(input: PriorityInput): PriorityResult {
-  let score = 0;
+  if (input.stage && INACTIVE_STAGES.has(input.stage)) {
+    return { score: MIN_PRIORITY, reasons: ["Inactive opportunity"] };
+  }
+
+  let score = 3;
   const reasons: string[] = [];
 
   const targetDate = input.deadline || input.due_at;
 
   if (isWithinHours(targetDate, 24)) {
-    score += 50;
+    score += 3;
     reasons.push("Deadline is within 24 hours");
   } else if (isWithinHours(targetDate, 72)) {
-    score += 20;
+    score += 1;
     reasons.push("Deadline is within 3 days");
   }
 
   if (input.action_type === "reply") {
-    score += 30;
+    score += 3;
     reasons.push("Reply needed");
   } else if (input.stage === "Needs Reply") {
-    score += 30;
+    score += 3;
     reasons.push("Reply needed");
   }
 
   if (input.stage === "Recruiter Chat") {
-    score += 22;
+    score += 2;
     reasons.push("Active recruiter conversation");
   }
 
   if (input.stage === "Interview Scheduling") {
-    score += 30;
+    score += 3;
     reasons.push("Scheduling request");
   }
 
   if (input.stage === "Interviewing" || input.stage === "OA Pending") {
-    score += 18;
+    score += 2;
     reasons.push("Active interview process");
   }
 
   if (input.action_type === "oa") {
-    score += 25;
+    score += 2;
     reasons.push("Online assessment pending");
   }
 
   if (isWithinLastHours(input.created_at, 48)) {
-    score += 10;
+    score += 1;
     reasons.push("Recently received");
   }
 
   if (isWithinLastHours(input.updated_at, 24)) {
-    score += 8;
+    score += 1;
     reasons.push("Recently updated");
   }
 
@@ -101,18 +123,14 @@ export function calculatePriority(input: PriorityInput): PriorityResult {
   }
 
   if (input.stage === "Waiting") {
-    score -= 10;
-  }
-
-  if (input.stage === "Rejected" || input.stage === "Ghosted") {
-    score -= 50;
+    score -= 1;
   }
 
   if (reasons.length === 0) {
     reasons.push("Standard priority");
   }
 
-  return { score: Math.max(score, 0), reasons };
+  return { score: clampPriority(score), reasons };
 }
 
 export function getPrimaryReason(reasons: string[]): string {

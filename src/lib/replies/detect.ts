@@ -1,5 +1,8 @@
 import type { ActionWithOpportunity, Opportunity } from "@/lib/types";
-import { calculatePriority } from "@/lib/prioritizer";
+import {
+  calculatePriority,
+  normalizeStoredPriorityScore,
+} from "@/lib/prioritizer";
 
 export interface NeedsReplyItem {
   key: string;
@@ -101,7 +104,10 @@ export function detectNeedsReply(
       role: opp?.role_title ?? null,
       headline: action.title,
       reason,
-      priorityScore: Math.max(action.priority_score, priority.score),
+      priorityScore: Math.max(
+        normalizeStoredPriorityScore(action.priority_score),
+        priority.score
+      ),
     });
   }
 
@@ -128,7 +134,10 @@ export function detectNeedsReply(
       role: opportunity.role_title,
       headline: reason,
       reason,
-      priorityScore: Math.max(opportunity.priority_score, priority.score),
+      priorityScore: Math.max(
+        normalizeStoredPriorityScore(opportunity.priority_score),
+        priority.score
+      ),
     });
   }
 

@@ -1,4 +1,5 @@
 import { STAGES } from "../constants";
+import { normalizeStoredPriorityScore } from "../prioritizer";
 import type { Opportunity } from "../types";
 
 const STAGE_RANK = new Map(STAGES.map((stage, index) => [stage, index]));
@@ -55,7 +56,10 @@ export function mergeOpportunityFields(
     role_title: primary.role_title ?? secondary.role_title,
     source: pickMergedSource(primary, secondary),
     stage: pickMergedStage(primary.stage, secondary.stage),
-    priority_score: Math.max(primary.priority_score, secondary.priority_score),
+    priority_score: Math.max(
+      normalizeStoredPriorityScore(primary.priority_score),
+      normalizeStoredPriorityScore(secondary.priority_score)
+    ),
     deadline: pickMergedDeadline(primary.deadline, secondary.deadline),
     next_action: nextAction,
     notes: notes || null,

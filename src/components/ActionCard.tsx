@@ -42,7 +42,7 @@ export default function ActionCard({
         <div className="flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
-              Priority {action.priority_score}
+              Priority {priority.score}/10
             </span>
             <span className="text-xs text-slate-500 capitalize">
               {action.action_type}

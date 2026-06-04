@@ -17,6 +17,7 @@ import type { Tone } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
 import type { Action, Draft, Message, Opportunity } from "@/lib/types";
 import { STAGE_COLORS } from "@/lib/constants";
+import { normalizeStoredPriorityScore } from "@/lib/prioritizer";
 import { formatDate, cn, formatMessageBody } from "@/lib/utils";
 
 export default function OpportunityDetailPage() {
@@ -226,7 +227,7 @@ export default function OpportunityDetailPage() {
           </p>
           <p>
             <span className="font-medium text-slate-500">Priority:</span>{" "}
-            {opportunity.priority_score}
+            {normalizeStoredPriorityScore(opportunity.priority_score)}/10
           </p>
           <p>
             <span className="font-medium text-slate-500">Deadline:</span>{" "}

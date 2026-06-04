@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Opportunity } from "@/lib/types";
 import { STAGE_COLORS, STAGES } from "@/lib/constants";
+import { normalizeStoredPriorityScore } from "@/lib/prioritizer";
 import { formatDate, formatRelative, cn } from "@/lib/utils";
 
 const OPPORTUNITY_DRAG_TYPE = "application/x-opportunity-id";
@@ -73,7 +74,7 @@ export default function OpportunityCard({
               stageColor
             )}
           >
-            P{opportunity.priority_score}
+            {normalizeStoredPriorityScore(opportunity.priority_score)}/10
           </span>
         </div>
         <p className="mt-2 text-xs capitalize text-slate-500">

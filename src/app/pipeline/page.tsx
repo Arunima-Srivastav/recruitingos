@@ -8,7 +8,17 @@ import { getSupabaseConfigError } from "@/lib/config";
 import Link from "next/link";
 import { STAGES } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
+import { normalizeStoredPriorityScore } from "@/lib/prioritizer";
 import type { Opportunity } from "@/lib/types";
+
+function normalizeOpportunityPriorities(rows: Opportunity[]): Opportunity[] {
+  return rows
+    .map((row) => ({
+      ...row,
+      priority_score: normalizeStoredPriorityScore(row.priority_score),
+    }))
+    .sort((a, b) => b.priority_score - a.priority_score);
+}
 
 export default function PipelinePage() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -35,7 +45,9 @@ export default function PipelinePage() {
         .select("*")
         .order("priority_score", { ascending: false });
       if (fetchError) throw fetchError;
-      setOpportunities((data ?? []) as Opportunity[]);
+      setOpportunities(
+        normalizeOpportunityPriorities((data ?? []) as Opportunity[])
+      );
     } catch (err) {
       setError(
         err instanceof Error
