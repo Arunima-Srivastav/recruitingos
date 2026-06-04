@@ -14,6 +14,7 @@ This repository is my **CS 153 final project**, focused on using AI tools to sca
 
 
 **Repo:** [github.com/Arunima-Srivastav/recruitingos](https://github.com/Arunima-Srivastav/recruitingos)
+
 **Live Website:** [https://recruiting-os-5fe8b.ondigitalocean.app/](RecruitingOS)
 To interact with the website, please create an account and load demo data. There's no need to verify your account.
 
